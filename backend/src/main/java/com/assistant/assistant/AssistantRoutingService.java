@@ -135,7 +135,44 @@ public class AssistantRoutingService {
             Map<String, Object> args = objectMapper.readValue(argumentsJson, Map.class);
             if ("fetch_recent_emails".equals(name)) {
                 String q = (String) args.get("query");
-                return gmailService.listMessages(q, 5);
+                Map<String, Object> listResult = (Map<String, Object>) gmailService.listMessages(q, 5);
+                List<Map<String, Object>> messages = (List<Map<String, Object>>) listResult.get("messages");
+                
+                if (messages == null || messages.isEmpty()) {
+                    return List.of();
+                }
+
+                List<Map<String, String>> richEmails = new ArrayList<>();
+                for (Map<String, Object> msgStub : messages) {
+                    String id = (String) msgStub.get("id");
+                    Map<String, Object> details = (Map<String, Object>) gmailService.getMessage(id);
+                    
+                    String snippet = (String) details.getOrDefault("snippet", "");
+                    Map<String, Object> payload = (Map<String, Object>) details.get("payload");
+                    List<Map<String, String>> headers = payload != null ? (List<Map<String, String>>) payload.get("headers") : null;
+                    
+                    String subject = "(No Subject)";
+                    String from = "(Unknown Sender)";
+                    String date = "";
+                    
+                    if (headers != null) {
+                        for (Map<String, String> header : headers) {
+                            String headerName = header.get("name");
+                            if ("Subject".equalsIgnoreCase(headerName)) subject = header.get("value");
+                            else if ("From".equalsIgnoreCase(headerName)) from = header.get("value");
+                            else if ("Date".equalsIgnoreCase(headerName)) date = header.get("value");
+                        }
+                    }
+                    
+                    richEmails.add(Map.of(
+                        "id", id,
+                        "subject", subject,
+                        "from", from,
+                        "date", date,
+                        "snippet", snippet
+                    ));
+                }
+                return richEmails;
             } else if ("fetch_upcoming_meetings".equals(name)) {
                 Integer max = (Integer) args.get("maxResults");
                 return calendarService.listUpcomingEvents(max != null ? max : 5);
