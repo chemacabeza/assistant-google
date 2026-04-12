@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Assistant from './pages/Assistant';
 import Gmail from './pages/Gmail';
 import Calendar from './pages/Calendar';
 import Templates from './pages/Templates';
@@ -27,6 +28,7 @@ function App() {
             <Route element={<Layout />}>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/assistant" element={<Assistant />} />
               
               {/* Feature routes */}
               <Route path="/gmail" element={<Gmail />} />

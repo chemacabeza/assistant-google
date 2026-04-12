@@ -1,14 +1,19 @@
 com/assistant/assistant/AssistantRoutingService.class
+com/assistant/templates/ScheduledEmailDispatcher.class
+com/assistant/contacts/ContactsController.class
 com/assistant/auth/OAuthToken.class
 com/assistant/templates/TemplateController.class
 com/assistant/auth/UserRepository.class
 com/assistant/audit/Auditable.class
 com/assistant/config/WebClientConfig.class
+com/assistant/config/SecurityConfig$1.class
 com/assistant/exception/GlobalExceptionHandler$ErrorResponse.class
 com/assistant/audit/AuditLoggingAspect.class
 com/assistant/util/CryptoUtil.class
 com/assistant/util/EncryptedStringConverter.class
+com/assistant/contacts/ContactsService.class
 com/assistant/templates/CustomAnswerTemplate.class
+com/assistant/auth/CustomOidcUserService.class
 com/assistant/calendar/CalendarController.class
 com/assistant/exception/GlobalExceptionHandler.class
 com/assistant/templates/CustomAnswerTemplateRepository.class
@@ -16,6 +21,7 @@ com/assistant/auth/OAuthTokenRepository.class
 com/assistant/gmail/GmailController.class
 com/assistant/templates/TemplateService.class
 com/assistant/auth/CustomOAuth2UserService.class
+com/assistant/contacts/ContactsService$ContactDto.class
 com/assistant/audit/AuditLog.class
 com/assistant/auth/AuthController.class
 com/assistant/audit/AuditLogRepository.class

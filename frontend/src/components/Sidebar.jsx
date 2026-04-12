@@ -1,10 +1,11 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Mail, Calendar, Settings, Bot, BookTemplate, MapPin } from 'lucide-react';
+import { Mail, Calendar, Settings, Bot, BookTemplate, MapPin, LayoutDashboard } from 'lucide-react';
 
 const Sidebar = () => {
   const navItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: <Bot size={20} /> },
+    { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
+    { name: 'Assistant', path: '/assistant', icon: <Bot size={20} /> },
     { name: 'Gmail', path: '/gmail', icon: <Mail size={20} /> },
     { name: 'Calendar', path: '/calendar', icon: <Calendar size={20} /> },
     { name: 'Custom Answers', path: '/templates', icon: <BookTemplate size={20} /> },
