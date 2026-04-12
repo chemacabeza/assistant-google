@@ -35,7 +35,7 @@ const Sidebar = () => {
           >
             {item.icon}
             <span className="font-medium">{item.name}</span>
-          <0/NavLink>
+          </NavLink>
         ))}
       </nav>
       <div className="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
