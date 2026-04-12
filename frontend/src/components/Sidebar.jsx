@@ -17,7 +17,7 @@ const Sidebar = () => {
     <aside className="w-64 bg-slate-900 text-white flex flex-col h-full shrink-0">
       <div className="p-6">
         <h2 className="text-xl font-bold tracking-wider text-blue-400 flex items-center gap-2">
-          <Bot /> ANTIGRAVITY
+          <Bot /> Chema's AI Assistant
         </h2>
       </div>
       <nav className="flex-1 px-4 mt-4 space-y-2">
