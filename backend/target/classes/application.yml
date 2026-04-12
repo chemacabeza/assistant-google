@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: google-assistant
+  
+  config:
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/assistant_db}
+    username: ${POSTGRES_USER:assistant_user}
+    password: ${POSTGRES_PASSWORD:assistant_password}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            redirect-uri: "http://localhost:8080/login/oauth2/code/google"
+            scope:
+              - openid
+              - profile
+              - email
+              - https://www.googleapis.com/auth/gmail.readonly
+              - https://www.googleapis.com/auth/gmail.send
+              - https://www.googleapis.com/auth/calendar
+              - https://www.googleapis.com/auth/contacts.readonly
+              - https://www.googleapis.com/auth/contacts.other.readonly
+        provider:
+          google:
+            user-name-attribute: email
+
+server:
+  port: 8080
+  
+# Application specific config
+app:
+  encryption-key: ${TOKEN_ENCRYPTION_KEY:0123456789abcdef0123456789abcdef}
+  frontend-url: http://localhost:5173
