@@ -22,6 +22,7 @@
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/exception/GlobalExceptionHandler.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/gmail/GmailController.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/gmail/GmailService.java
+/home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/maps/MapsService.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/templates/CustomAnswerTemplate.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/templates/CustomAnswerTemplateRepository.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/templates/ScheduledEmailDispatcher.java

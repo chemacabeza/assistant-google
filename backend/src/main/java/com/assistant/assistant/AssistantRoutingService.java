@@ -2,6 +2,7 @@ package com.assistant.assistant;
 
 import com.assistant.calendar.CalendarService;
 import com.assistant.gmail.GmailService;
+import com.assistant.maps.MapsService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -13,6 +14,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Service
 public class AssistantRoutingService {
@@ -23,6 +26,7 @@ public class AssistantRoutingService {
     private final WebClient webClient;
     private final GmailService gmailService;
     private final CalendarService calendarService;
+    private final MapsService mapsService;
     private final ObjectMapper objectMapper;
 
     // Define the rigid JSON schema for tools available to the Assistant
@@ -46,13 +50,40 @@ public class AssistantRoutingService {
                     "maxResults", Map.of("type", "integer", "description", "Maximum number of events to return, default 5")
                 )
             )
+        )),
+        Map.of("type", "function", "function", Map.of(
+            "name", "calculate_drive_duration",
+            "description", "Calculates the real-time driving duration between two locations using Google Maps.",
+            "parameters", Map.of(
+                "type", "object",
+                "properties", Map.of(
+                    "origin", Map.of("type", "string", "description", "Starting address or location"),
+                    "destination", Map.of("type", "string", "description", "Destination address or location")
+                ),
+                "required", List.of("origin", "destination")
+            )
+        )),
+        Map.of("type", "function", "function", Map.of(
+            "name", "schedule_calendar_event",
+            "description", "Schedules a new event directly on the user's Google Calendar.",
+            "parameters", Map.of(
+                "type", "object",
+                "properties", Map.of(
+                    "summary", Map.of("type", "string", "description", "Title of the calendar event"),
+                    "location", Map.of("type", "string", "description", "Physical location address (optional)"),
+                    "startTimeISO", Map.of("type", "string", "description", "Start time in strict ISO 8601 format (e.g., 2026-04-13T15:00:00+02:00)"),
+                    "endTimeISO", Map.of("type", "string", "description", "End time in strict ISO 8601 format (e.g., 2026-04-13T16:00:00+02:00)")
+                ),
+                "required", List.of("summary", "startTimeISO", "endTimeISO")
+            )
         ))
     );
 
-    public AssistantRoutingService(WebClient.Builder webClientBuilder, GmailService gmailService, CalendarService calendarService, ObjectMapper objectMapper) {
+    public AssistantRoutingService(WebClient.Builder webClientBuilder, GmailService gmailService, CalendarService calendarService, MapsService mapsService, ObjectMapper objectMapper) {
         this.webClient = webClientBuilder.build();
         this.gmailService = gmailService;
         this.calendarService = calendarService;
+        this.mapsService = mapsService;
         this.objectMapper = objectMapper;
     }
 
@@ -62,7 +93,8 @@ public class AssistantRoutingService {
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", "You are an executive AI assistant. You have direct database access to organize the user's Gmail and Calendar. Use your provided tools to fetch context when they ask. Synthesize the raw JSON structures you receive into extremely readable human descriptions."));
+        String prompt = "You are an executive AI assistant. The current server date and time is " + ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) + ". You have direct database access to organize the user's Gmail and Calendar. Formulate your answers mapping exact calendar structures relative to this real-time anchor. Synthesize the raw JSON structures you receive into extremely readable human descriptions. When directed to plan travel, evaluate the precise distance using maps and optionally insert blocker blocks onto the calendar if requested to do so.";
+        messages.add(Map.of("role", "system", "content", prompt));
         messages.add(Map.of("role", "user", "content", query));
 
         return callOpenAiWithTools(messages, query);
@@ -176,6 +208,23 @@ public class AssistantRoutingService {
             } else if ("fetch_upcoming_meetings".equals(name)) {
                 Integer max = (Integer) args.get("maxResults");
                 return calendarService.listUpcomingEvents(max != null ? max : 5);
+            } else if ("calculate_drive_duration".equals(name)) {
+                String origin = (String) args.get("origin");
+                String destination = (String) args.get("destination");
+                return mapsService.calculateDriveDuration(origin, destination);
+            } else if ("schedule_calendar_event".equals(name)) {
+                String summary = (String) args.get("summary");
+                String location = (String) args.get("location");
+                String start = (String) args.get("startTimeISO");
+                String end = (String) args.get("endTimeISO");
+                
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("summary", summary);
+                if (location != null && !location.isEmpty()) payload.put("location", location);
+                payload.put("start", Map.of("dateTime", start));
+                payload.put("end", Map.of("dateTime", end));
+                
+                return calendarService.createEvent(payload);
             }
         } catch (Exception e) {
             e.printStackTrace();

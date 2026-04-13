@@ -18,6 +18,7 @@ com/assistant/calendar/CalendarController.class
 com/assistant/exception/GlobalExceptionHandler.class
 com/assistant/templates/CustomAnswerTemplateRepository.class
 com/assistant/auth/OAuthTokenRepository.class
+com/assistant/maps/MapsService.class
 com/assistant/gmail/GmailController.class
 com/assistant/templates/TemplateService.class
 com/assistant/auth/CustomOAuth2UserService.class
