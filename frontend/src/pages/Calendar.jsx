@@ -86,11 +86,29 @@ const Calendar = () => {
                     {event.location && <span className="flex items-center gap-1.5"><MapPin size={14} className="text-red-400" /> {event.location}</span>}
                   </div>
                 </div>
-                {event.htmlLink && (
-                  <a href={event.htmlLink} target="_blank" rel="noreferrer" className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded flex-shrink-0 self-start md:self-center hover:bg-indigo-100 transition-colors">
-                    View in Calendar
-                  </a>
-                )}
+                <div className="flex flex-col md:flex-row gap-2 self-start md:self-center">
+                  <button 
+                    onClick={() => {
+                        const targetEmail = window.prompt("Send event details to:", "jleehille@gmail.com");
+                        if (!targetEmail) return;
+                        
+                        const time = getEventTime(event);
+                        const body = `Hi,\n\nI just wanted to share the details for "${event.summary || 'an event'}".\nTime: ${time}\nLocation: ${event.location || 'TBD'}\nLink: ${event.htmlLink || ''}\n\nThanks!`;
+                        const str = "To: " + targetEmail + "\r\nSubject: Event Details: " + (event.summary || 'Meeting') + "\r\n\r\n" + body;
+                        const b64 = btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+                        
+                        api.post('/api/gmail/send', { raw: b64 }).then(() => alert('Email sent successfully!')).catch(e => alert('Failed to send email: ' + e));
+                    }}
+                    className="text-xs font-semibold text-white bg-indigo-600 px-3 py-1.5 rounded flex-shrink-0 hover:bg-indigo-700 transition-colors"
+                  >
+                    Send Email
+                  </button>
+                  {event.htmlLink && (
+                    <a href={event.htmlLink} target="_blank" rel="noreferrer" className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded flex-shrink-0 hover:bg-indigo-100 transition-colors text-center">
+                      View in Calendar
+                    </a>
+                  )}
+                </div>
               </div>
             ))}
           </div>
