@@ -1,6 +1,7 @@
 package com.assistant.assistant;
 
 import com.assistant.calendar.CalendarService;
+import com.assistant.contacts.ContactsService;
 import com.assistant.gmail.GmailService;
 import com.assistant.maps.MapsService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,6 +28,7 @@ public class AssistantRoutingService {
     private final GmailService gmailService;
     private final CalendarService calendarService;
     private final MapsService mapsService;
+    private final ContactsService contactsService;
     private final ObjectMapper objectMapper;
 
     // Define the rigid JSON schema for tools available to the Assistant
@@ -74,18 +76,32 @@ public class AssistantRoutingService {
                     "startTimeISO", Map.of("type", "string", "description", "Start time in strict ISO 8601 format (e.g., 2026-04-13T15:00:00+02:00)"),
                     "endTimeISO", Map.of("type", "string", "description", "End time in strict ISO 8601 format (e.g., 2026-04-13T16:00:00+02:00)"),
                     "originAddress", Map.of("type", "string", "description", "Starting location for generating a Google Maps route Link (optional)"),
-                    "destinationAddress", Map.of("type", "string", "description", "Ending location for generating a Google Maps route Link (optional)")
+                    "destinationAddress", Map.of("type", "string", "description", "Ending location for generating a Google Maps route Link (optional)"),
+                    "attendeeEmails", Map.of(
+                        "type", "array", 
+                        "description", "A list of exact email addresses to formally invite to the calendar event",
+                        "items", Map.of("type", "string")
+                    )
                 ),
                 "required", List.of("summary", "startTimeISO", "endTimeISO")
+            )
+        )),
+        Map.of("type", "function", "function", Map.of(
+            "name", "search_google_contacts",
+            "description", "Fetches the complete list of Google Contacts returning names and email arrays to parse exact invitees.",
+            "parameters", Map.of(
+                "type", "object",
+                "properties", Map.of()
             )
         ))
     );
 
-    public AssistantRoutingService(WebClient.Builder webClientBuilder, GmailService gmailService, CalendarService calendarService, MapsService mapsService, ObjectMapper objectMapper) {
+    public AssistantRoutingService(WebClient.Builder webClientBuilder, GmailService gmailService, CalendarService calendarService, MapsService mapsService, ContactsService contactsService, ObjectMapper objectMapper) {
         this.webClient = webClientBuilder.build();
         this.gmailService = gmailService;
         this.calendarService = calendarService;
         this.mapsService = mapsService;
+        this.contactsService = contactsService;
         this.objectMapper = objectMapper;
     }
 
@@ -224,6 +240,8 @@ public class AssistantRoutingService {
                 String origin = (String) args.get("origin");
                 String destination = (String) args.get("destination");
                 return mapsService.calculateDriveDuration(origin, destination);
+            } else if ("search_google_contacts".equals(name)) {
+                return contactsService.fetchGoogleContacts();
             } else if ("schedule_calendar_event".equals(name)) {
                 String summary = (String) args.get("summary");
                 String location = (String) args.get("location");
@@ -231,6 +249,7 @@ public class AssistantRoutingService {
                 String end = (String) args.get("endTimeISO");
                 String origin = (String) args.get("originAddress");
                 String dest = (String) args.get("destinationAddress");
+                List<String> attendeeEmails = (List<String>) args.get("attendeeEmails");
                 
                 Map<String, Object> payload = new HashMap<>();
                 payload.put("summary", summary);
@@ -241,6 +260,14 @@ public class AssistantRoutingService {
                 if (origin != null && !origin.isEmpty() && dest != null && !dest.isEmpty()) {
                     String url = "https://www.google.com/maps/dir/?api=1&origin=" + java.net.URLEncoder.encode(origin, "UTF-8") + "&destination=" + java.net.URLEncoder.encode(dest, "UTF-8");
                     payload.put("source", Map.of("title", "Google Maps directions", "url", url));
+                }
+                
+                if (attendeeEmails != null && !attendeeEmails.isEmpty()) {
+                    List<Map<String, String>> attendeesMap = new ArrayList<>();
+                    for(String e : attendeeEmails) {
+                        attendeesMap.add(Map.of("email", e));
+                    }
+                    payload.put("attendees", attendeesMap);
                 }
                 
                 return calendarService.createEvent(payload);
