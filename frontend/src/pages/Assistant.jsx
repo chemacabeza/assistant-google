@@ -20,7 +20,22 @@ const Assistant = () => {
     setLoading(true);
 
     try {
-      const res = await api.post('/api/assistant/ask', { query: userMessage });
+      // Structure historical context to bind stateless engine properly
+      const payloadHistory = history
+        .filter(msg => 
+          msg.text && 
+          msg.sender !== 'system' && 
+          !msg.text.includes("Hello! I'm your Google Assistant")
+        )
+        .map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.text
+        }));
+
+      const res = await api.post('/api/assistant/ask', { 
+        query: userMessage,
+        history: payloadHistory
+      });
       const intentData = res.data;
       
       let responseText = "Sorry, I couldn't process that.";

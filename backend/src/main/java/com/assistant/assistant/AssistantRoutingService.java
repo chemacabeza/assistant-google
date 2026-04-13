@@ -87,7 +87,7 @@ public class AssistantRoutingService {
         this.objectMapper = objectMapper;
     }
 
-    public Map<String, Object> parseIntent(String query) {
+    public Map<String, Object> parseIntent(String query, List<Map<String, String>> history) {
         if (openAiApiKey == null || openAiApiKey.isEmpty()) {
             return Map.of("action", "CHAT", "response", "OpenAI API Key is not configured.");
         }
@@ -95,6 +95,16 @@ public class AssistantRoutingService {
         List<Map<String, Object>> messages = new ArrayList<>();
         String prompt = "You are an executive AI assistant. The current server date and time is " + ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) + ". You have direct database access to organize the user's Gmail and Calendar. Formulate your answers mapping exact calendar structures relative to this real-time anchor. Synthesize the raw JSON structures you receive into extremely readable human descriptions. When directed to plan travel, evaluate the precise distance using maps and optionally insert blocker blocks onto the calendar if requested to do so.";
         messages.add(Map.of("role", "system", "content", prompt));
+        
+        if (history != null) {
+            for(Map<String, String> h : history) {
+                // Safely load prior user and assistant context arrays
+                if(h.get("role") != null && h.get("content") != null) {
+                    messages.add(Map.of("role", h.get("role"), "content", h.get("content")));
+                }
+            }
+        }
+        
         messages.add(Map.of("role", "user", "content", query));
 
         return callOpenAiWithTools(messages, query);
