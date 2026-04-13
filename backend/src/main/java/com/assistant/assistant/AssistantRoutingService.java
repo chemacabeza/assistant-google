@@ -72,7 +72,9 @@ public class AssistantRoutingService {
                     "summary", Map.of("type", "string", "description", "Title of the calendar event"),
                     "location", Map.of("type", "string", "description", "Physical location address (optional)"),
                     "startTimeISO", Map.of("type", "string", "description", "Start time in strict ISO 8601 format (e.g., 2026-04-13T15:00:00+02:00)"),
-                    "endTimeISO", Map.of("type", "string", "description", "End time in strict ISO 8601 format (e.g., 2026-04-13T16:00:00+02:00)")
+                    "endTimeISO", Map.of("type", "string", "description", "End time in strict ISO 8601 format (e.g., 2026-04-13T16:00:00+02:00)"),
+                    "originAddress", Map.of("type", "string", "description", "Starting location for generating a Google Maps route Link (optional)"),
+                    "destinationAddress", Map.of("type", "string", "description", "Ending location for generating a Google Maps route Link (optional)")
                 ),
                 "required", List.of("summary", "startTimeISO", "endTimeISO")
             )
@@ -227,12 +229,19 @@ public class AssistantRoutingService {
                 String location = (String) args.get("location");
                 String start = (String) args.get("startTimeISO");
                 String end = (String) args.get("endTimeISO");
+                String origin = (String) args.get("originAddress");
+                String dest = (String) args.get("destinationAddress");
                 
                 Map<String, Object> payload = new HashMap<>();
                 payload.put("summary", summary);
                 if (location != null && !location.isEmpty()) payload.put("location", location);
                 payload.put("start", Map.of("dateTime", start));
                 payload.put("end", Map.of("dateTime", end));
+
+                if (origin != null && !origin.isEmpty() && dest != null && !dest.isEmpty()) {
+                    String url = "https://www.google.com/maps/dir/?api=1&origin=" + java.net.URLEncoder.encode(origin, "UTF-8") + "&destination=" + java.net.URLEncoder.encode(dest, "UTF-8");
+                    payload.put("source", Map.of("title", "Google Maps directions", "url", url));
+                }
                 
                 return calendarService.createEvent(payload);
             }
