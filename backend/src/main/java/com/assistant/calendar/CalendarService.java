@@ -36,7 +36,7 @@ public class CalendarService {
     @Auditable(actionType = "CREATE_EVENT")
     public Object createEvent(Object payload) {
         return webClient.post()
-                .uri(CALENDAR_BASE_URL + "/events")
+                .uri(CALENDAR_BASE_URL + "/events?sendUpdates=all")
                 .bodyValue(payload)
                 .retrieve()
                 .bodyToMono(Object.class)
@@ -46,7 +46,7 @@ public class CalendarService {
     @Auditable(actionType = "UPDATE_EVENT")
     public Object updateEvent(String eventId, Object payload) {
         return webClient.put()
-                .uri(CALENDAR_BASE_URL + "/events/" + eventId)
+                .uri(CALENDAR_BASE_URL + "/events/" + eventId + "?sendUpdates=all")
                 .bodyValue(payload)
                 .retrieve()
                 .bodyToMono(Object.class)
