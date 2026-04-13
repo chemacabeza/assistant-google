@@ -11,12 +11,13 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 
 @Service
 public class AssistantRoutingService {
@@ -92,6 +93,23 @@ public class AssistantRoutingService {
             "parameters", Map.of(
                 "type", "object",
                 "properties", Map.of()
+            )
+        )),
+        Map.of("type", "function", "function", Map.of(
+            "name", "send_email",
+            "description", "Sends an email natively to an exact array of emails using the authenticated Gmail endpoint.",
+            "parameters", Map.of(
+                "type", "object",
+                "properties", Map.of(
+                    "toEmails", Map.of(
+                        "type", "array",
+                        "description", "Array of exact recipient email addresses",
+                        "items", Map.of("type", "string")
+                    ),
+                    "subject", Map.of("type", "string", "description", "Subject line of the email"),
+                    "content", Map.of("type", "string", "description", "The raw text content or summary to place in the body")
+                ),
+                "required", List.of("toEmails", "subject", "content")
             )
         ))
     );
@@ -271,6 +289,17 @@ public class AssistantRoutingService {
                 }
                 
                 return calendarService.createEvent(payload);
+            } else if ("send_email".equals(name)) {
+                List<String> toEmails = (List<String>) args.get("toEmails");
+                String subject = (String) args.get("subject");
+                String content = (String) args.get("content");
+
+                String rawMessage = "To: " + String.join(",", toEmails) + "\r\n" +
+                                    "Subject: " + subject + "\r\n\r\n" +
+                                    content;
+
+                String encodedEmail = Base64.getUrlEncoder().encodeToString(rawMessage.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                return gmailService.sendEmail(Map.of("raw", encodedEmail));
             }
         } catch (Exception e) {
             e.printStackTrace();
