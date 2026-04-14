@@ -20,6 +20,56 @@ public class ContactsService {
         this.webClient = webClient;
     }
 
+    public List<ContactDto> searchPeople(String query) {
+        try {
+            Map searchResponse = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("https://people.googleapis.com/v1/people:searchContacts")
+                            .queryParam("query", query)
+                            .queryParam("readMask", "names,emailAddresses")
+                            .build())
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block();
+            
+            return parseSearchResults(searchResponse);
+        } catch (Exception e) {
+            logger.error("Failed searching people with query {}: {}", query, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<ContactDto> parseSearchResults(Map response) {
+        List<ContactDto> resultList = new ArrayList<>();
+        if (response == null || !response.containsKey("results")) {
+            return resultList;
+        }
+
+        List<Map<String, Object>> results = (List<Map<String, Object>>) response.get("results");
+        for (Map<String, Object> result : results) {
+            Map<String, Object> person = (Map<String, Object>) result.get("person");
+            if (person == null) continue;
+
+            String name = "";
+            if (person.containsKey("names")) {
+                List<Map<String, Object>> names = (List<Map<String, Object>>) person.get("names");
+                if (!names.isEmpty() && names.get(0).containsKey("displayName")) {
+                    name = (String) names.get(0).get("displayName");
+                }
+            }
+
+            if (person.containsKey("emailAddresses")) {
+                List<Map<String, Object>> emails = (List<Map<String, Object>>) person.get("emailAddresses");
+                for (Map<String, Object> emailObj : emails) {
+                    if (emailObj.containsKey("value")) {
+                        resultList.add(new ContactDto(name, (String) emailObj.get("value")));
+                    }
+                }
+            }
+        }
+        return resultList;
+    }
+
     public List<ContactDto> fetchGoogleContacts() {
         List<ContactDto> completeList = new ArrayList<>();
 

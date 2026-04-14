@@ -89,19 +89,60 @@ const Calendar = () => {
                 <div className="flex flex-col md:flex-row gap-2 self-start md:self-center">
                   <button 
                     onClick={() => {
-                        const targetEmail = window.prompt("Send event details to:", "jleehille@gmail.com");
+                        const targetEmail = window.prompt("Send calendar invite to:", "jleehille@gmail.com");
                         if (!targetEmail) return;
+
+                        const formatToUTC = (dateStr) => {
+                            if (!dateStr) return '';
+                            return new Date(dateStr).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+                        };
+
+                        const dtstamp = formatToUTC(new Date().toISOString());
+                        const dtstart = formatToUTC(event.start?.dateTime || event.start?.date);
+                        const dtend = formatToUTC(event.end?.dateTime || event.end?.date || event.start?.dateTime || event.start?.date);
                         
-                        const time = getEventTime(event);
-                        const body = `Hi,\n\nI just wanted to share the details for "${event.summary || 'an event'}".\nTime: ${time}\nLocation: ${event.location || 'TBD'}\nLink: ${event.htmlLink || ''}\n\nThanks!`;
-                        const str = "To: " + targetEmail + "\r\nSubject: Event Details: " + (event.summary || 'Meeting') + "\r\n\r\n" + body;
+                        const icsBody = [
+                            "BEGIN:VCALENDAR",
+                            "VERSION:2.0",
+                            "PRODID:-//Google Assistant Workspace//EN",
+                            "METHOD:REQUEST",
+                            "BEGIN:VEVENT",
+                            `UID:${event.id || Date.now()}`,
+                            `DTSTAMP:${dtstamp}`,
+                            `DTSTART:${dtstart}`,
+                            `DTEND:${dtend}`,
+                            `SUMMARY:${event.summary || 'Meeting'}`,
+                            `LOCATION:${event.location || ''}`,
+                            `ORGANIZER;CN=chemacabeza:mailto:chemacabeza@gmail.com`,
+                            `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${targetEmail}`,
+                            "CLASS:PUBLIC",
+                            "STATUS:CONFIRMED",
+                            "SEQUENCE:0",
+                            "END:VEVENT",
+                            "END:VCALENDAR"
+                        ].join("\r\n");
+
+                        const boundary = "alt_boundary_" + Date.now();
+                        let str = `To: ${targetEmail}\r\n`;
+                        str += `Subject: Invitation: ${event.summary || 'Meeting'}\r\n`;
+                        str += `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n`;
+                        str += `--${boundary}\r\n`;
+                        str += `Content-Type: text/plain; charset="UTF-8"\r\n\r\n`;
+                        str += `Hi,\n\nYou have been invited to "${event.summary || 'an event'}".\nLink: ${event.htmlLink || ''}\n\nThanks!\r\n\r\n`;
+                        str += `--${boundary}\r\n`;
+                        str += `Content-Type: text/calendar; method=REQUEST; charset="UTF-8"\r\n\r\n`;
+                        str += icsBody + "\r\n\r\n";
+                        str += `--${boundary}--`;
+
                         const b64 = btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
                         
-                        api.post('/api/gmail/send', { raw: b64 }).then(() => alert('Email sent successfully!')).catch(e => alert('Failed to send email: ' + e));
+                        api.post('/api/gmail/send', { raw: b64 })
+                           .then(() => alert('Calendar invite sent successfully!'))
+                           .catch(e => alert('Failed to send invite: ' + e));
                     }}
                     className="text-xs font-semibold text-white bg-indigo-600 px-3 py-1.5 rounded flex-shrink-0 hover:bg-indigo-700 transition-colors"
                   >
-                    Send Email
+                    Send Invite
                   </button>
                   {event.htmlLink && (
                     <a href={event.htmlLink} target="_blank" rel="noreferrer" className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded flex-shrink-0 hover:bg-indigo-100 transition-colors text-center">

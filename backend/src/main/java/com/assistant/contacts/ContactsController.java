@@ -21,4 +21,9 @@ public class ContactsController {
     public ResponseEntity<List<ContactsService.ContactDto>> getContacts() {
         return ResponseEntity.ok(contactsService.fetchGoogleContacts());
     }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<ContactsService.ContactDto>> searchContacts(@org.springframework.web.bind.annotation.RequestParam String q) {
+        return ResponseEntity.ok(contactsService.searchPeople(q));
+    }
 }

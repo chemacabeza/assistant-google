@@ -68,31 +68,37 @@ public class AssistantRoutingService {
         )),
         Map.of("type", "function", "function", Map.of(
             "name", "schedule_calendar_event",
-            "description", "Schedules a new event directly on the user's Google Calendar.",
+            "description", "Schedules a new event directly on the user's Google Calendar. For driving/travel events, always use: colorId '11' (red), visibility 'private', a short description with the route name or street, and reminderMinutes 10.",
             "parameters", Map.of(
                 "type", "object",
-                "properties", Map.of(
-                    "summary", Map.of("type", "string", "description", "Title of the calendar event"),
-                    "location", Map.of("type", "string", "description", "Physical location address (optional)"),
-                    "startTimeISO", Map.of("type", "string", "description", "Start time in strict ISO 8601 format (e.g., 2026-04-13T15:00:00+02:00)"),
-                    "endTimeISO", Map.of("type", "string", "description", "End time in strict ISO 8601 format (e.g., 2026-04-13T16:00:00+02:00)"),
-                    "originAddress", Map.of("type", "string", "description", "Starting location for generating a Google Maps route Link (optional)"),
-                    "destinationAddress", Map.of("type", "string", "description", "Ending location for generating a Google Maps route Link (optional)"),
-                    "attendeeEmails", Map.of(
+                "properties", new java.util.LinkedHashMap<String, Object>() {{
+                    put("summary", Map.of("type", "string", "description", "Title of the calendar event. For driving events use format: 'Drive from [Origin] to [Destination]'"));
+                    put("description", Map.of("type", "string", "description", "Short description or notes for the event (e.g. route name like 'B96a', or destination street name)"));
+                    put("location", Map.of("type", "string", "description", "Destination address for the event (optional)"));
+                    put("startTimeISO", Map.of("type", "string", "description", "Start time in strict ISO 8601 format (e.g., 2026-04-13T15:00:00+02:00)"));
+                    put("endTimeISO", Map.of("type", "string", "description", "End time in strict ISO 8601 format (e.g., 2026-04-13T16:00:00+02:00)"));
+                    put("originAddress", Map.of("type", "string", "description", "Starting location for generating a Google Maps route Link (optional)"));
+                    put("destinationAddress", Map.of("type", "string", "description", "Ending location for generating a Google Maps route Link (optional)"));
+                    put("colorId", Map.of("type", "string", "description", "Google Calendar color ID. Use '11' (red/tomato) for driving/travel events. Other options: '1' lavender, '2' sage, '3' grape, '4' flamingo, '5' banana, '6' tangerine, '7' peacock, '8' graphite, '9' blueberry, '10' basil"));
+                    put("visibility", Map.of("type", "string", "description", "Event visibility: 'private' or 'public'. Use 'private' for personal/driving events."));
+                    put("reminderMinutes", Map.of("type", "integer", "description", "Number of minutes before the event to trigger a popup reminder. Default 10 minutes for driving events."));
+                    put("attendeeEmails", Map.of(
                         "type", "array", 
                         "description", "A list of exact email addresses to formally invite to the calendar event",
                         "items", Map.of("type", "string")
-                    )
-                ),
+                    ));
+                }},
                 "required", List.of("summary", "startTimeISO", "endTimeISO")
             )
         )),
         Map.of("type", "function", "function", Map.of(
             "name", "search_google_contacts",
-            "description", "Fetches the complete list of Google Contacts returning names and email arrays to parse exact invitees.",
+            "description", "Searches for or fetches the user's Google Contacts. If a query is provided, it searches for specific people by name or email. Otherwise, it returns a full aggregation of contacts.",
             "parameters", Map.of(
                 "type", "object",
-                "properties", Map.of()
+                "properties", Map.of(
+                    "query", Map.of("type", "string", "description", "Optional search query (e.g., a person's name like 'Jennifer')")
+                )
             )
         )),
         Map.of("type", "function", "function", Map.of(
@@ -129,7 +135,7 @@ public class AssistantRoutingService {
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        String prompt = "You are an executive AI assistant. The current server date and time is " + ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) + ". You have direct database access to organize the user's Gmail and Calendar. Formulate your answers mapping exact calendar structures relative to this real-time anchor. Synthesize the raw JSON structures you receive into extremely readable human descriptions. When directed to plan travel, evaluate the precise distance using maps and optionally insert blocker blocks onto the calendar if requested to do so. CRITICAL INSTRUCTION: If the maps API returns an error or REQUEST_DENIED, you MUST autonomously estimate the travel time yourself using your internal geographical knowledge and immediately schedule the requested calendar blocks based on your estimate without asking for the user's permission first.";
+        String prompt = "You are an executive AI assistant. The current server date and time is " + ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) + ". You have direct database access to organize the user's Gmail and Calendar. Formulate your answers mapping exact calendar structures relative to this real-time anchor. Synthesize the raw JSON structures you receive into extremely readable human descriptions. When directed to plan travel, evaluate the precise distance using maps and optionally insert blocker blocks onto the calendar if requested to do so. CRITICAL INSTRUCTION: If the maps API returns an error or REQUEST_DENIED, you MUST autonomously estimate the travel time yourself using your internal geographical knowledge and immediately schedule the requested calendar blocks based on your estimate without asking for the user's permission first. DRIVING EVENT FORMATTING: When creating drive/travel calendar events, ALWAYS apply these defaults: title format 'Drive from [Origin] to [Destination]', colorId '11' (red), visibility 'private', reminderMinutes 10, set the description to the destination street name or route name, set location to the destination address, and always include originAddress and destinationAddress for Google Maps directions. NAME RESOLUTION: If the user mentions a person by name (e.g., 'Jennifer Lee Hillestad') and you need their email for a tool, use `search_google_contacts` with that name as the query to find their exact associated email address.";
         messages.add(Map.of("role", "system", "content", prompt));
         
         if (history != null) {
@@ -259,22 +265,49 @@ public class AssistantRoutingService {
                 String destination = (String) args.get("destination");
                 return mapsService.calculateDriveDuration(origin, destination);
             } else if ("search_google_contacts".equals(name)) {
+                String query = (String) args.get("query");
+                if (query != null && !query.isEmpty()) {
+                    return contactsService.searchPeople(query);
+                }
                 return contactsService.fetchGoogleContacts();
             } else if ("schedule_calendar_event".equals(name)) {
                 String summary = (String) args.get("summary");
+                String description = (String) args.get("description");
                 String location = (String) args.get("location");
                 String start = (String) args.get("startTimeISO");
                 String end = (String) args.get("endTimeISO");
                 String origin = (String) args.get("originAddress");
                 String dest = (String) args.get("destinationAddress");
+                String colorId = (String) args.get("colorId");
+                String visibility = (String) args.get("visibility");
+                Integer reminderMinutes = args.get("reminderMinutes") instanceof Number 
+                    ? ((Number) args.get("reminderMinutes")).intValue() : null;
                 List<String> attendeeEmails = (List<String>) args.get("attendeeEmails");
                 
                 Map<String, Object> payload = new HashMap<>();
                 payload.put("summary", summary);
+                if (description != null && !description.isEmpty()) payload.put("description", description);
                 if (location != null && !location.isEmpty()) payload.put("location", location);
                 payload.put("start", Map.of("dateTime", start));
                 payload.put("end", Map.of("dateTime", end));
 
+                // Color (e.g. "11" = red/tomato for driving events)
+                if (colorId != null && !colorId.isEmpty()) payload.put("colorId", colorId);
+
+                // Visibility ("private" or "public")
+                if (visibility != null && !visibility.isEmpty()) payload.put("visibility", visibility);
+
+                // Reminders override (popup N minutes before)
+                if (reminderMinutes != null) {
+                    Map<String, Object> reminders = new HashMap<>();
+                    reminders.put("useDefault", false);
+                    reminders.put("overrides", List.of(
+                        Map.of("method", "popup", "minutes", reminderMinutes)
+                    ));
+                    payload.put("reminders", reminders);
+                }
+
+                // Google Maps directions source link
                 if (origin != null && !origin.isEmpty() && dest != null && !dest.isEmpty()) {
                     String url = "https://www.google.com/maps/dir/?api=1&origin=" + java.net.URLEncoder.encode(origin, "UTF-8") + "&destination=" + java.net.URLEncoder.encode(dest, "UTF-8");
                     payload.put("source", Map.of("title", "Google Maps directions", "url", url));
