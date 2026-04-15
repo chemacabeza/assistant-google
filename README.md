@@ -1,5 +1,9 @@
 # Antigravity Google Assistant Full-Stack
 
+<p align="center">
+  <img src="./images/hero.png" alt="AI Butler Assistant" width="400"/>
+</p>
+
 A production-ready full-stack application connecting securely to your Google Account (Gmail & Calendar) featuring a conversational AI assistant router and custom email reply templates.
 
 ## Architecture & Tech Stack
