@@ -21,7 +21,7 @@ echo "========================================"
 echo "Services started successfully:"
 echo "Frontend UI:   http://localhost:5173"
 echo "Backend API:   http://localhost:8080"
-echo "PostgreSQL:    localhost:5432"
+echo "PostgreSQL:    localhost:5433"
 echo "========================================"
 echo ""
 # Wait for the frontend to become responsive and open the browser

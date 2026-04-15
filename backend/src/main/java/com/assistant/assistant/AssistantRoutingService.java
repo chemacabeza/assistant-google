@@ -68,7 +68,7 @@ public class AssistantRoutingService {
         )),
         Map.of("type", "function", "function", Map.of(
             "name", "schedule_calendar_event",
-            "description", "Schedules a new event directly on the user's Google Calendar. For driving/travel events, always use: colorId '11' (red), visibility 'private', a short description with the route name or street, and reminderMinutes 10.",
+            "description", "Schedules a new event directly on the user's Google Calendar. For driving/travel events, always use: colorId '11' (red), visibility 'private', and a short description with the route name or street. Reminders are automatically added.",
             "parameters", Map.of(
                 "type", "object",
                 "properties", new java.util.LinkedHashMap<String, Object>() {{
@@ -81,7 +81,6 @@ public class AssistantRoutingService {
                     put("destinationAddress", Map.of("type", "string", "description", "Ending location for generating a Google Maps route Link (optional)"));
                     put("colorId", Map.of("type", "string", "description", "Google Calendar color ID. Use '11' (red/tomato) for driving/travel events. Other options: '1' lavender, '2' sage, '3' grape, '4' flamingo, '5' banana, '6' tangerine, '7' peacock, '8' graphite, '9' blueberry, '10' basil"));
                     put("visibility", Map.of("type", "string", "description", "Event visibility: 'private' or 'public'. Use 'private' for personal/driving events."));
-                    put("reminderMinutes", Map.of("type", "integer", "description", "Number of minutes before the event to trigger a popup reminder. Default 10 minutes for driving events."));
                     put("attendeeEmails", Map.of(
                         "type", "array", 
                         "description", "A list of exact email addresses to formally invite to the calendar event",
@@ -135,7 +134,17 @@ public class AssistantRoutingService {
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        String prompt = "You are an executive AI assistant. The current server date and time is " + ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) + ". You have direct database access to organize the user's Gmail and Calendar. Formulate your answers mapping exact calendar structures relative to this real-time anchor. Synthesize the raw JSON structures you receive into extremely readable human descriptions. When directed to plan travel, evaluate the precise distance using maps and optionally insert blocker blocks onto the calendar if requested to do so. CRITICAL INSTRUCTION: If the maps API returns an error or REQUEST_DENIED, you MUST autonomously estimate the travel time yourself using your internal geographical knowledge and immediately schedule the requested calendar blocks based on your estimate without asking for the user's permission first. DRIVING EVENT FORMATTING: When creating drive/travel calendar events, ALWAYS apply these defaults: title format 'Drive from [Origin] to [Destination]', colorId '11' (red), visibility 'private', reminderMinutes 10, set the description to the destination street name or route name, set location to the destination address, and always include originAddress and destinationAddress for Google Maps directions. NAME RESOLUTION: If the user mentions a person by name (e.g., 'Jennifer Lee Hillestad') and you need their email for a tool, use `search_google_contacts` with that name as the query to find their exact associated email address. MULTI-LEG ROUTING & BACKWARD CHAINING: When a user requests a multi-leg trip with a fixed final arrival time, you MUST calculate the travel durations for ALL legs first using calculate_drive_duration. Then, mathematically work backwards: subtract the final leg's duration from the strictly defined final arrival time to find the required start time of the final leg. That start time becomes the precise end time of the preceding leg. Subtract the preceding leg's duration to find its start time, ensuring absolutely continuous blocks.";
+        String prompt = "You are an executive AI assistant. The current server date and time is " + ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) + ". You have direct database access to organize the user's Gmail and Calendar. Formulate your answers mapping exact calendar structures relative to this real-time anchor. Synthesize the raw JSON structures you receive into extremely readable human descriptions. When directed to plan travel, evaluate the precise distance using maps and optionally insert blocker blocks onto the calendar if requested to do so. CRITICAL INSTRUCTION: If the maps API returns an error or REQUEST_DENIED, you MUST autonomously estimate the travel time yourself using your internal geographical knowledge and immediately schedule the requested calendar blocks based on your estimate without asking for the user's permission first. DRIVING EVENT FORMATTING: When creating drive/travel calendar events, ALWAYS apply these defaults: title format 'Drive from [Origin] to [Destination]', colorId '11' (red), visibility 'private', set the description to the destination street name or route name, set location to the destination address, and always include originAddress and destinationAddress for Google Maps directions. Reminders (10 min and 30 min popups) are automatically added to all events. NAME RESOLUTION: If the user mentions a person by name (e.g., 'Jennifer Lee Hillestad') and you need their email for a tool, use `search_google_contacts` with that name as the query to find their exact associated email address. ";
+            + "MULTI-LEG ROUTING WITH FIXED ARRIVAL TIME — THIS IS CRITICAL: "
+            + "When the user says 'I need to arrive at [final destination] at [TIME]', the LAST event's endTime MUST equal [TIME]. "
+            + "STEP 1: Calculate ALL leg durations first using calculate_drive_duration. "
+            + "STEP 2: Work BACKWARDS from the final arrival time. The LAST leg's endTime = the user's requested arrival time. The LAST leg's startTime = endTime minus its duration. "
+            + "STEP 3: The preceding leg's endTime = the LAST leg's startTime. The preceding leg's startTime = its endTime minus its duration. "
+            + "EXAMPLE: User says 'arrive at C at 16:00'. Leg1 (A→B) = 22 min, Leg2 (B→C) = 8 min. "
+            + "Leg2 endTime = 16:00, Leg2 startTime = 15:52. Leg1 endTime = 15:52, Leg1 startTime = 15:30. "
+            + "WRONG: Leg1 = 15:38-16:00, Leg2 = 16:00-16:08. This would arrive at C at 16:08, which is LATE. "
+            + "CORRECT: Leg1 = 15:30-15:52, Leg2 = 15:52-16:00. This arrives at C at exactly 16:00. "
+            + "NEVER set the last event to START at the arrival time. The last event must END at the arrival time.";
         messages.add(Map.of("role", "system", "content", prompt));
         
         if (history != null) {
@@ -280,8 +289,7 @@ public class AssistantRoutingService {
                 String dest = (String) args.get("destinationAddress");
                 String colorId = (String) args.get("colorId");
                 String visibility = (String) args.get("visibility");
-                Integer reminderMinutes = args.get("reminderMinutes") instanceof Number 
-                    ? ((Number) args.get("reminderMinutes")).intValue() : null;
+
                 List<String> attendeeEmails = (List<String>) args.get("attendeeEmails");
                 
                 Map<String, Object> payload = new HashMap<>();
@@ -297,15 +305,14 @@ public class AssistantRoutingService {
                 // Visibility ("private" or "public")
                 if (visibility != null && !visibility.isEmpty()) payload.put("visibility", visibility);
 
-                // Reminders override (popup N minutes before)
-                if (reminderMinutes != null) {
-                    Map<String, Object> reminders = new HashMap<>();
-                    reminders.put("useDefault", false);
-                    reminders.put("overrides", List.of(
-                        Map.of("method", "popup", "minutes", reminderMinutes)
-                    ));
-                    payload.put("reminders", reminders);
-                }
+                // Always add 10-minute and 30-minute popup reminders
+                Map<String, Object> reminders = new HashMap<>();
+                reminders.put("useDefault", false);
+                reminders.put("overrides", List.of(
+                    Map.of("method", "popup", "minutes", 10),
+                    Map.of("method", "popup", "minutes", 30)
+                ));
+                payload.put("reminders", reminders);
 
                 // Google Maps directions source link
                 if (origin != null && !origin.isEmpty() && dest != null && !dest.isEmpty()) {
