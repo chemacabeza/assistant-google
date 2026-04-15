@@ -15,6 +15,7 @@
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/auth/UserRepository.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/calendar/CalendarController.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/calendar/CalendarService.java
+/home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/config/ConfigController.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/config/SecurityConfig.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/config/WebClientConfig.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/contacts/ContactsController.java

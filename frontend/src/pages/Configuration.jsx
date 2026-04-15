@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, ExternalLink, Key, ToggleLeft, ToggleRight, Type, Shield, Map, Brain, Mail, Calendar, Users, MessageSquare } from 'lucide-react';
+import { Settings, Save, ExternalLink, Key, ToggleLeft, ToggleRight, Type, Shield, Map, Brain, Mail, Calendar, Users, MessageSquare, Loader2 } from 'lucide-react';
+import { api } from '../api/axios';
 
-const STORAGE_KEY = 'assistant_config';
+const UI_STORAGE_KEY = 'assistant_ui_config';
 
 const defaultConfig = {
   appName: 'Personal AI Assistant',
@@ -14,26 +15,73 @@ const defaultConfig = {
   },
 };
 
-const loadConfig = () => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return { ...defaultConfig, ...parsed, apiKeys: { ...defaultConfig.apiKeys, ...parsed.apiKeys } };
-    }
-  } catch (e) { /* ignore */ }
-  return defaultConfig;
-};
-
 const Configuration = () => {
-  const [config, setConfig] = useState(loadConfig);
+  const [config, setConfig] = useState(defaultConfig);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [statusMsg, setStatusMsg] = useState('');
   const [visibleKeys, setVisibleKeys] = useState({});
 
-  const handleSave = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  // Load config on mount: UI settings from localStorage, API keys from backend .env
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        // Load UI-only settings from localStorage
+        let uiConfig = {};
+        try {
+          const stored = localStorage.getItem(UI_STORAGE_KEY);
+          if (stored) uiConfig = JSON.parse(stored);
+        } catch (e) { /* ignore */ }
+
+        // Load API keys from backend .env file
+        const res = await api.get('/api/config/env');
+        const envKeys = res.data || {};
+
+        setConfig({
+          appName: uiConfig.appName || defaultConfig.appName,
+          emailInvitees: uiConfig.emailInvitees !== undefined ? uiConfig.emailInvitees : defaultConfig.emailInvitees,
+          apiKeys: {
+            GOOGLE_CLIENT_ID: envKeys.GOOGLE_CLIENT_ID || '',
+            GOOGLE_CLIENT_SECRET: envKeys.GOOGLE_CLIENT_SECRET || '',
+            OPENAI_API_KEY: envKeys.OPENAI_API_KEY || '',
+            VITE_GOOGLE_MAPS_API_KEY: envKeys.VITE_GOOGLE_MAPS_API_KEY || '',
+          },
+        });
+      } catch (e) {
+        console.error('Failed to load configuration:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadConfig();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setStatusMsg('');
+    try {
+      // Save UI settings to localStorage
+      localStorage.setItem(UI_STORAGE_KEY, JSON.stringify({
+        appName: config.appName,
+        emailInvitees: config.emailInvitees,
+      }));
+
+      // Save API keys to backend .env file
+      const res = await api.post('/api/config/env', config.apiKeys);
+      if (res.data?.success) {
+        setSaved(true);
+        setStatusMsg(res.data.message || 'Saved successfully');
+        setTimeout(() => { setSaved(false); setStatusMsg(''); }, 4000);
+      } else {
+        setStatusMsg(res.data?.message || 'Save failed');
+      }
+    } catch (e) {
+      console.error('Failed to save configuration:', e);
+      setStatusMsg('Error saving configuration: ' + (e.response?.data?.message || e.message));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleKeyVisibility = (keyName) => {
@@ -125,12 +173,32 @@ const Configuration = () => {
               ? 'bg-green-500 text-white shadow-lg shadow-green-500/30'
               : 'bg-violet-600 text-white hover:bg-violet-700 shadow-lg shadow-violet-500/30 hover:shadow-violet-500/40'
           }`}
+          disabled={saving}
         >
-          <Save size={16} />
-          {saved ? 'Saved ✓' : 'Save Configuration'}
+          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          {saving ? 'Saving...' : saved ? 'Saved ✓' : 'Save Configuration'}
         </button>
       </div>
 
+      {/* Status Message */}
+      {statusMsg && (
+        <div className={`rounded-lg px-4 py-3 text-sm font-medium ${
+          saved ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+        }`}>
+          {statusMsg}
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center py-20">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+            <p className="text-sm text-slate-500">Loading configuration from .env...</p>
+          </div>
+        </div>
+      ) : (
+      <>
       {/* General Settings Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-5 border-b border-gray-100 bg-slate-50/50">
@@ -182,7 +250,7 @@ const Configuration = () => {
             <Key size={18} className="text-amber-500" />
             API Keys
           </h2>
-          <span className="text-xs text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">Stored locally in browser</span>
+          <span className="text-xs text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full font-medium">Synced with .env file</span>
         </div>
         <div className="p-6 space-y-5">
           {apiKeyMeta.map(({ key, label, icon, hint }) => (
@@ -351,6 +419,9 @@ const Configuration = () => {
 
         </div>
       </div>
+
+      </>
+      )}
 
     </div>
   );
