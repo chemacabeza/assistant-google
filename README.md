@@ -13,6 +13,41 @@ A production-ready full-stack application connecting securely to your Google Acc
 *   **Database:** PostgreSQL 16 (handled via Docker Compose).
 *   **Containerization:** Fully dockerized (backend on Eclipse Temurin alpine, frontend on Nginx, postgres DB).
 
+## Required APIs
+
+This application integrates with the following external services. You must create accounts and obtain credentials for each:
+
+| Service | Purpose | Direct Link |
+| :--- | :--- | :--- |
+| **Gmail API** | Read inbox and send emails | [Enable Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com) |
+| **Google Calendar API** | Read and create calendar events | [Enable Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com) |
+| **Google Maps API** | Geocoding and places lookup | [Enable Maps API](https://console.cloud.google.com/apis/library/maps-backend.googleapis.com) |
+| **Google OAuth 2.0** | User authentication and authorization | [OAuth Credentials](https://console.cloud.google.com/apis/credentials) |
+| **OpenAI API** | AI assistant intent parsing and responses | [Get API Key](https://platform.openai.com/api-keys) |
+
+## Quick Start
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/chemacabeza/assistant-google.git
+cd assistant-google
+
+# 2. Copy the environment template
+cp backend/src/main/resources/.env.example backend/src/main/resources/.env
+
+# 3. Edit the .env file with your credentials
+nano backend/src/main/resources/.env
+
+# 4. Build the Docker containers
+./build.sh
+
+# 5. Start the application
+./start.sh
+
+# 6. Open in your browser
+# → http://localhost:5173
+```
+
 ## Setup Instructions
 
 ### 1. Google Cloud Platform Configuration
@@ -32,7 +67,7 @@ The application requires a secure OAuth 2.0 Web Client integrated with your Goog
         *   `https://www.googleapis.com/auth/gmail.readonly`
         *   `https://www.googleapis.com/auth/gmail.send`
         *   `https://www.googleapis.com/auth/calendar`
-    *   Add your own email (`chemacabeza@gmail.com`) as a **Test User** since the app will be in "Testing" mode to circumvent Google's rigorous app verification process.
+    *   Add your own email (e.g., `test@gmail.com`) as a **Test User** since the app will be in "Testing" mode to circumvent Google's rigorous app verification process.
 5.  Go to **APIs & Services > Credentials**:
     *   Click `Create Credentials > OAuth client ID`.
     *   Application type: **Web application**.
@@ -52,6 +87,8 @@ SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/assistant_db
 
 GOOGLE_CLIENT_ID=your_client_id_here
 GOOGLE_CLIENT_SECRET=your_client_secret_here
+
+OPENAI_API_KEY=your_openai_api_key_here
 
 # 256-bit AES encryption key for database token resting
 TOKEN_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef
