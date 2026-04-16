@@ -11,6 +11,7 @@ import Calendar from './pages/Calendar';
 import Templates from './pages/Templates';
 import Maps from './pages/Maps';
 import Configuration from './pages/Configuration';
+import Settings from './pages/Settings';
 
 // Create a client for React Query
 const queryClient = new QueryClient();
@@ -36,7 +37,7 @@ function App() {
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/templates" element={<Templates />} />
               <Route path="/maps" element={<Maps />} />
-              <Route path="/settings" element={<div className="p-6">Settings coming soon</div>} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/configuration" element={<Configuration />} />
               
             </Route>

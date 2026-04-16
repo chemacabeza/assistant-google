@@ -19,6 +19,9 @@ RUN echo 'server { \
     } \
     location /api/ { \
         proxy_pass http://backend:8080/api/; \
+        proxy_read_timeout 300s; \
+        proxy_connect_timeout 60s; \
+        proxy_send_timeout 300s; \
     } \
     location /oauth2/ { \
         proxy_pass http://backend:8080/oauth2/; \
