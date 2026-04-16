@@ -144,7 +144,8 @@ public class AssistantRoutingService {
             + "Leg2 endTime = 16:00, Leg2 startTime = 15:52. Leg1 endTime = 15:52, Leg1 startTime = 15:30. "
             + "WRONG: Leg1 = 15:38-16:00, Leg2 = 16:00-16:08. This would arrive at C at 16:08, which is LATE. "
             + "CORRECT: Leg1 = 15:30-15:52, Leg2 = 15:52-16:00. This arrives at C at exactly 16:00. "
-            + "NEVER set the last event to START at the arrival time. The last event must END at the arrival time.";
+            + "NEVER set the last event to START at the arrival time. The last event must END at the arrival time. "
+            + "LANGUAGE: You are fully bilingual in English and Spanish. Always detect the language the user writes in and respond in that same language. If the user writes in Spanish, respond entirely in Spanish. If the user writes in English, respond in English. Calendar event titles and descriptions should also match the user's language.";
         messages.add(Map.of("role", "system", "content", prompt));
         
         if (history != null) {
