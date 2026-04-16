@@ -55,13 +55,14 @@ public class AssistantRoutingService {
             )
         )),
         Map.of("type", "function", "function", Map.of(
-            "name", "calculate_drive_duration",
-            "description", "Calculates the real-time driving duration between two locations using Google Maps.",
+            "name", "calculate_travel_duration",
+            "description", "Calculates the real-time travel duration between two locations using Google Maps. Supports driving, walking, bicycling, and transit.",
             "parameters", Map.of(
                 "type", "object",
                 "properties", Map.of(
                     "origin", Map.of("type", "string", "description", "Starting address or location"),
-                    "destination", Map.of("type", "string", "description", "Destination address or location")
+                    "destination", Map.of("type", "string", "description", "Destination address or location"),
+                    "travelMode", Map.of("type", "string", "description", "Mode of travel: 'driving', 'walking', 'bicycling', or 'transit'. Defaults to 'driving' if not specified.")
                 ),
                 "required", List.of("origin", "destination")
             )
@@ -145,10 +146,10 @@ public class AssistantRoutingService {
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        String prompt = "You are an executive AI assistant. The current server date and time is " + ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) + ". You have direct database access to organize the user's Gmail and Calendar. Formulate your answers mapping exact calendar structures relative to this real-time anchor. Synthesize the raw JSON structures you receive into extremely readable human descriptions. When directed to plan travel, evaluate the precise distance using maps and optionally insert blocker blocks onto the calendar if requested to do so. CRITICAL INSTRUCTION: If the maps API returns an error or REQUEST_DENIED, you MUST autonomously estimate the travel time yourself using your internal geographical knowledge and immediately schedule the requested calendar blocks based on your estimate without asking for the user's permission first. DRIVING EVENT FORMATTING: When creating drive/travel calendar events, ALWAYS apply these defaults: title format 'Drive from [Origin] to [Destination]', colorId '11' (red), visibility 'private', set the description to the destination street name or route name, set location to the destination address, and always include originAddress and destinationAddress for Google Maps directions. Reminders (10 min and 30 min popups) are automatically added to all events. NAME RESOLUTION: If the user mentions a person by name (e.g., 'Jennifer Lee Hillestad') and you need their email for a tool, use `search_google_contacts` with that name as the query to find their exact associated email address. ";
+        String prompt = "You are an executive AI assistant. The current server date and time is " + ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) + ". You have direct database access to organize the user's Gmail and Calendar. Formulate your answers mapping exact calendar structures relative to this real-time anchor. Synthesize the raw JSON structures you receive into extremely readable human descriptions. When directed to plan travel, evaluate the precise distance using maps and optionally insert blocker blocks onto the calendar if requested to do so. CRITICAL INSTRUCTION: If the maps API returns an error or REQUEST_DENIED, you MUST autonomously estimate the travel time yourself using your internal geographical knowledge and immediately schedule the requested calendar blocks based on your estimate without asking for the user's permission first. TRAVEL EVENT FORMATTING: When creating travel calendar events, ALWAYS apply these defaults: title format '[Mode] from [Origin] to [Destination]' (e.g., 'Drive from Home to Work', 'Transit from Berlin Hbf to Airport'), visibility 'private', set the description to the destination street name or route name, set location to the destination address, and always include originAddress and destinationAddress for navigation links. COLORS: Use colorId '11' (red) for driving, '9' (peacock/blue) for transit, '2' (sage/green) for walking or bicycling. Reminders (10 min and 30 min popups) are automatically added to all events. NAME RESOLUTION: If the user mentions a person by name (e.g., 'Jennifer Lee Hillestad') and you need their email for a tool, use `search_google_contacts` with that name as the query to find their exact associated email address. ";
             + "MULTI-LEG ROUTING WITH FIXED ARRIVAL TIME — THIS IS CRITICAL: "
             + "When the user says 'I need to arrive at [final destination] at [TIME]', the LAST event's endTime MUST equal [TIME]. "
-            + "STEP 1: Calculate ALL leg durations first using calculate_drive_duration. "
+            + "STEP 1: Calculate ALL leg durations first using calculate_travel_duration with the appropriate mode. "
             + "STEP 2: Work BACKWARDS from the final arrival time. The LAST leg's endTime = the user's requested arrival time. The LAST leg's startTime = endTime minus its duration. "
             + "STEP 3: The preceding leg's endTime = the LAST leg's startTime. The preceding leg's startTime = its endTime minus its duration. "
             + "EXAMPLE: User says 'arrive at C at 16:00'. Leg1 (A→B) = 22 min, Leg2 (B→C) = 8 min. "
@@ -281,10 +282,11 @@ public class AssistantRoutingService {
             } else if ("fetch_upcoming_meetings".equals(name)) {
                 Integer max = (Integer) args.get("maxResults");
                 return calendarService.listUpcomingEvents(max != null ? max : 5);
-            } else if ("calculate_drive_duration".equals(name)) {
+            } else if ("calculate_travel_duration".equals(name)) {
                 String origin = (String) args.get("origin");
                 String destination = (String) args.get("destination");
-                return mapsService.calculateDriveDuration(origin, destination);
+                String mode = (String) args.get("travelMode");
+                return mapsService.calculateTravelDuration(origin, destination, mode);
             } else if ("search_google_contacts".equals(name)) {
                 String query = (String) args.get("query");
                 if (query != null && !query.isEmpty()) {

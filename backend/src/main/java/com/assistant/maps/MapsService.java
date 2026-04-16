@@ -17,11 +17,13 @@ public class MapsService {
         this.webClient = webClientBuilder.build();
     }
 
-    public Object calculateDriveDuration(String origin, String destination) {
+    public Object calculateTravelDuration(String origin, String destination, String mode) {
         if (mapsApiKey == null || mapsApiKey.isEmpty()) {
             return Map.of("error", "Maps API Key is not bound to server layer.");
         }
         
+        String travelMode = (mode != null && !mode.isEmpty()) ? mode.toLowerCase() : "driving";
+
         try {
             return webClient.get()
                 .uri(builder -> builder
@@ -30,6 +32,7 @@ public class MapsService {
                     .path("/maps/api/distancematrix/json")
                     .queryParam("origins", origin)
                     .queryParam("destinations", destination)
+                    .queryParam("mode", travelMode)
                     .queryParam("departure_time", "now") // Fetch duration_in_traffic
                     .queryParam("key", mapsApiKey)
                     .build())
