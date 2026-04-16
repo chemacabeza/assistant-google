@@ -116,6 +116,17 @@ public class AssistantRoutingService {
                 ),
                 "required", List.of("toEmails", "subject", "content")
             )
+        )),
+        Map.of("type", "function", "function", Map.of(
+            "name", "delete_calendar_event",
+            "description", "Deletes an event from the user's Google Calendar using its unique event ID.",
+            "parameters", Map.of(
+                "type", "object",
+                "properties", Map.of(
+                    "eventId", Map.of("type", "string", "description", "The unique ID of the event to delete")
+                ),
+                "required", List.of("eventId")
+            )
         ))
     );
 
@@ -145,7 +156,7 @@ public class AssistantRoutingService {
             + "WRONG: Leg1 = 15:38-16:00, Leg2 = 16:00-16:08. This would arrive at C at 16:08, which is LATE. "
             + "CORRECT: Leg1 = 15:30-15:52, Leg2 = 15:52-16:00. This arrives at C at exactly 16:00. "
             + "NEVER set the last event to START at the arrival time. The last event must END at the arrival time. "
-            + "LANGUAGE: You are fully bilingual in English and Spanish. Always detect the language the user writes in and respond in that same language. If the user writes in Spanish, respond entirely in Spanish. If the user writes in English, respond in English. Calendar event titles and descriptions should also match the user's language.";
+            + "LANGUAGE: You are fully bilingual in English and Spanish. Always detect the language the user writes in and respond in that same language. If the user writes in Spanish, respond entirely in Spanish. If the user writes in English, respond in English. Calendar event titles and descriptions should also match the user's language. ANDROID AUTO: A navigation link labeled '🚗 Android Auto' is automatically appended to the description of any calendar event with a location or destination address. You do not need to add this manually.";
         messages.add(Map.of("role", "system", "content", prompt));
         
         if (history != null) {
@@ -315,10 +326,23 @@ public class AssistantRoutingService {
                 ));
                 payload.put("reminders", reminders);
 
-                // Google Maps directions source link
-                if (origin != null && !origin.isEmpty() && dest != null && !dest.isEmpty()) {
-                    String url = "https://www.google.com/maps/dir/?api=1&origin=" + java.net.URLEncoder.encode(origin, "UTF-8") + "&destination=" + java.net.URLEncoder.encode(dest, "UTF-8");
-                    payload.put("source", Map.of("title", "Google Maps directions", "url", url));
+                // Google Maps / Android Auto Navigation Link
+                String mapsUrl = null;
+                String targetAddr = (dest != null && !dest.isEmpty()) ? dest : location;
+                
+                if (targetAddr != null && !targetAddr.isEmpty()) {
+                    if (origin != null && !origin.isEmpty()) {
+                        mapsUrl = "https://www.google.com/maps/dir/?api=1&origin=" + java.net.URLEncoder.encode(origin, "UTF-8") + "&destination=" + java.net.URLEncoder.encode(targetAddr, "UTF-8");
+                    } else {
+                        mapsUrl = "https://www.google.com/maps/dir/?api=1&destination=" + java.net.URLEncoder.encode(targetAddr, "UTF-8");
+                    }
+                }
+
+                if (mapsUrl != null) {
+                    String androidAutoLink = "\n\n🚗 Android Auto: " + mapsUrl;
+                    description = (description == null ? "" : description) + androidAutoLink;
+                    payload.put("description", description);
+                    payload.put("source", Map.of("title", "Google Maps directions", "url", mapsUrl));
                 }
                 
                 if (attendeeEmails != null && !attendeeEmails.isEmpty()) {
@@ -341,6 +365,10 @@ public class AssistantRoutingService {
 
                 String encodedEmail = Base64.getUrlEncoder().encodeToString(rawMessage.getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 return gmailService.sendEmail(Map.of("raw", encodedEmail));
+            } else if ("delete_calendar_event".equals(name)) {
+                String eventId = (String) args.get("eventId");
+                calendarService.deleteEvent(eventId);
+                return Map.of("success", true, "message", "Event deleted successfully");
             }
         } catch (Exception e) {
             e.printStackTrace();
