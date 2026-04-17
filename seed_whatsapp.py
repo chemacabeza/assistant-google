@@ -13,7 +13,7 @@ conn = psycopg2.connect(
 cur = conn.cursor()
 
 contacts = [
-    ("33652846353", "Moi"), # Special case
+    ("33123456789", "Moi"), # Special case
     ("346111222", "Carlos Alarcon"),
     ("346222333", "Mamá"),
     ("346333444", "Jennifer Lee Hillestad"),

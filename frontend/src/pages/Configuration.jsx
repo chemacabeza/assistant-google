@@ -152,7 +152,7 @@ const Configuration = () => {
     { key: 'GOOGLE_CLIENT_SECRET', label: 'Google Client Secret', icon: <Shield size={16} />, hint: 'OAuth 2.0 Client Secret' },
     { key: 'OPENAI_API_KEY', label: 'OpenAI API Key', icon: <Brain size={16} />, hint: 'Secret key from platform.openai.com' },
     { key: 'VITE_GOOGLE_MAPS_API_KEY', label: 'Google Maps API Key', icon: <Map size={16} />, hint: 'API key with Maps JavaScript & Directions APIs enabled' },
-    { key: 'WHATSAPP_PHONE_NUMBER', label: 'WhatsApp Owner Phone', icon: <MessageSquare size={16} />, hint: 'Your phone number in international format (+33 652846353)' },
+    { key: 'WHATSAPP_PHONE_NUMBER', label: 'WhatsApp Owner Phone', icon: <MessageSquare size={16} />, hint: 'Your phone number in international format (+33 123456789)' },
   ];
 
   return (

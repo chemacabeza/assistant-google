@@ -28,7 +28,7 @@ const WhatsApp = () => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedContactId, setSelectedContactId] = useState(null);
-  const [ownerPhone, setOwnerPhone] = useState('33652846353');
+  const [ownerPhone, setOwnerPhone] = useState('33123456789');
 
   // Load Owner Identity from Config
   useEffect(() => {
