@@ -110,6 +110,25 @@ Once the stack is started, access your live deployment via `http://localhost:517
 3. Run frontend Vite server: `cd frontend && npm run dev`
 4. Access `http://localhost:5173`. The Vite proxy will securely map `/api` and `/login` HTTP transactions dynamically.
 
+### 3. Meta Business (WhatsApp) Configuration
+
+To achieve real-time mirroring of your WhatsApp session, you must link your account via Meta's Business Suite:
+
+1.  **Create a Meta App**:
+    *   Go to the [Meta for Developers](https://developers.facebook.com/) portal.
+    *   Create a "Business" type app and add the **WhatsApp** product.
+2.  **Webhook Setup**:
+    *   Set the Webhook URL to: `https://your-domain.ngrok-free.app/api/whatsapp/webhook`
+    *   Set the **Verify Token** to: `chema_assistant_2026` (as defined in `WhatsAppWebhookController`).
+    *   Subscribe to the `messages` field.
+3.  **Identity Configuration**:
+    *   The application identifies your messages (the "You" / "Moi" label) based on your configured phone number.
+    *   **Easy Way**: Open the application at `http://localhost:5173/configuration`.
+    *   Under the **WhatsApp Owner Phone** field, enter your number in international format: `+33 652846353`.
+    *   Save and restart the containers.
+4.  **Verification**:
+    *   Ensure your Meta Business account is **Verified** in the [Security Center](https://business.facebook.com/latest/settings/security_center) to prevent service interruptions.
+
 ## Security & Privacy Considerations
 
 1. **Frontend Isolation**: Client Secrets and refresh tokens are *never* transmitted to the frontend. The React client identifies via an `HTTPOnly` session cookie issued by Spring Security (`JSESSIONID`).

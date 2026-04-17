@@ -11,16 +11,41 @@ import { api } from '../api/axios';
  * Implements a 2-column layout with dark mode aesthetics.
  */
 const NAME_MAPPING = {
-  "33652846353": "Moi"
+  'mtp_001': 'Minh-Tuan Pham',
+  'jlh_002': 'Jennifer Lee Hillestad',
+  '346222333': 'Mamá',
+  'ca_001': 'Carlos Alarcon',
+  'tp_001': 'Tsvetomir Petkov',
+  'pl_001': 'Programming Links',
+  'as_001': 'Adrián Siles',
+  'jm_001': 'Julia Marín De Los Heras',
+  'group_001': 'Random questions, curiosities and news'
 };
 
 const WhatsApp = () => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showSetup, setShowSetup] = useState(false);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedContactId, setSelectedContactId] = useState(null);
+  const [ownerPhone, setOwnerPhone] = useState('33652846353');
+
+  // Load Owner Identity from Config
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const res = await api.get('/api/config/env');
+        if (res.data?.WHATSAPP_PHONE_NUMBER) {
+          // Normalize the phone number (remove +, spaces, etc)
+          const normalized = res.data.WHATSAPP_PHONE_NUMBER.replace(/\D/g, '');
+          if (normalized) setOwnerPhone(normalized);
+        }
+      } catch (e) {
+        console.error('Failed to load whatsapp config:', e);
+      }
+    };
+    loadConfig();
+  }, []);
 
   // Sync Messages
   const fetchMessages = async () => {
@@ -60,6 +85,9 @@ const WhatsApp = () => {
       const isOutgoing = msg.direction === 'OUTGOING';
       let partnerId = (isOutgoing ? msg.recipientId : msg.senderId)?.trim();
       
+      // Normalize: remove prefix if it matches ownerPhone or common patterns
+      if (partnerId) partnerId = partnerId.replace(/\D/g, ''); 
+
       if (!partnerId) return;
 
       if (!groups[partnerId]) {
@@ -81,14 +109,17 @@ const WhatsApp = () => {
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
       c.id.includes(searchTerm)
     ).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }, [messages, searchTerm]);
+  }, [messages, searchTerm, ownerPhone]);
 
   // Compute Active Conversation
   const activeConversation = useMemo(() => {
     return messages
-      .filter(m => (m.direction === 'OUTGOING' ? m.recipientId : m.senderId) === selectedContactId)
+      .filter(m => {
+        const pId = (m.direction === 'OUTGOING' ? m.recipientId : m.senderId)?.replace(/\D/g, '');
+        return pId === selectedContactId;
+      })
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  }, [messages, selectedContactId]);
+  }, [messages, selectedContactId, ownerPhone]);
 
   const activeContact = contacts.find(c => c.id === selectedContactId);
 
@@ -320,8 +351,9 @@ const WhatsApp = () => {
                  };
 
                 // Group-specific names simulation
-                const senderNames = ["Jake Santos", "Jennifer Lee Hillestad", "Mamá", "Moi"];
-                const senderName = isGroup ? (isOutgoing ? "You" : senderNames[idx % senderNames.length]) : null;
+                const senderNames = ["Jake Santos", "Jennifer Lee Hillestad", "Mamá", "Tsvetomir Petkov"];
+                const senderNamePlaceholder = senderNames[idx % senderNames.length];
+                const senderName = isGroup ? (isOutgoing ? "You" : senderNamePlaceholder) : null;
                 const nameColors = ["text-[#ff8c00]", "text-[#32cd32]", "text-[#87ceeb]", "text-[#da70d6]"];
                 const nameColor = nameColors[idx % nameColors.length];
 
