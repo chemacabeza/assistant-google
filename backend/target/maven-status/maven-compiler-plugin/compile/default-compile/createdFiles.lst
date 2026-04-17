@@ -18,7 +18,9 @@ com/assistant/calendar/CalendarController.class
 com/assistant/exception/GlobalExceptionHandler.class
 com/assistant/templates/CustomAnswerTemplateRepository.class
 com/assistant/auth/OAuthTokenRepository.class
+com/assistant/telegram/TelegramPollingService.class
 com/assistant/maps/MapsService.class
+com/assistant/assistant/AssistantRoutingService$1.class
 com/assistant/gmail/GmailController.class
 com/assistant/templates/TemplateService.class
 com/assistant/auth/CustomOAuth2UserService.class
@@ -26,11 +28,16 @@ com/assistant/contacts/ContactsService$ContactDto.class
 com/assistant/audit/AuditLog.class
 com/assistant/auth/AuthController.class
 com/assistant/audit/AuditLogRepository.class
+com/assistant/audit/AuditController.class
 com/assistant/AssistantApplication.class
 com/assistant/gmail/GmailService.class
+com/assistant/whatsapp/WhatsAppMessageRepository.class
+com/assistant/config/ConfigController.class
 com/assistant/assistant/AssistantController$AssistantQuery.class
 com/assistant/config/SecurityConfig.class
+com/assistant/telegram/TelegramService.class
 com/assistant/auth/CustomOAuth2AuthorizedClientService.class
 com/assistant/auth/User.class
 com/assistant/assistant/AssistantController.class
 com/assistant/calendar/CalendarService.class
+com/assistant/whatsapp/WhatsAppController.class

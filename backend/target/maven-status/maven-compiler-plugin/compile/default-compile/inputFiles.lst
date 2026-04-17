@@ -1,6 +1,7 @@
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/AssistantApplication.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/assistant/AssistantController.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/assistant/AssistantRoutingService.java
+/home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/audit/AuditController.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/audit/AuditLog.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/audit/AuditLogRepository.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/audit/AuditLoggingAspect.java
@@ -24,6 +25,8 @@
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/gmail/GmailController.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/gmail/GmailService.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/maps/MapsService.java
+/home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/telegram/TelegramPollingService.java
+/home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/telegram/TelegramService.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/templates/CustomAnswerTemplate.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/templates/CustomAnswerTemplateRepository.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/templates/ScheduledEmailDispatcher.java
@@ -31,3 +34,8 @@
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/templates/TemplateService.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/util/CryptoUtil.java
 /home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/util/EncryptedStringConverter.java
+/home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/whatsapp/WhatsAppController.java
+/home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/whatsapp/WhatsAppMessage.java
+/home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/whatsapp/WhatsAppMessageRepository.java
+/home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/whatsapp/WhatsAppService.java
+/home/chemacabeza/Repositories/assistant-google.git/backend/src/main/java/com/assistant/whatsapp/WhatsAppWebhookController.java
