@@ -29,6 +29,9 @@ const WhatsApp = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedContactId, setSelectedContactId] = useState(null);
   const [ownerPhone, setOwnerPhone] = useState('33123456789');
+  const [newMessage, setNewMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
 
   // Load Owner Identity from Config
   useEffect(() => {
@@ -93,7 +96,7 @@ const WhatsApp = () => {
       if (!groups[partnerId]) {
         groups[partnerId] = {
            id: partnerId,
-           name: isOutgoing ? (NAME_MAPPING[partnerId] || partnerId) : (msg.senderName || partnerId),
+           name: NAME_MAPPING[partnerId] || msg.senderName || partnerId,
            timestamp: msg.timestamp,
            lastMessage: msg.content
         };
@@ -122,6 +125,35 @@ const WhatsApp = () => {
   }, [messages, selectedContactId, ownerPhone]);
 
   const activeContact = contacts.find(c => c.id === selectedContactId);
+
+  const getSubtext = () => {
+    if (!activeContact) return "";
+    if (activeContact.id.includes('group')) return "Click for group info";
+    // Simulated status
+    const statuses = ["online", "last seen recently", "online", "online", "offline"];
+    const hash = activeContact.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return statuses[hash % statuses.length];
+  };
+
+  const handleSendMessage = async (e) => {
+    if (e && e.key !== 'Enter') return;
+    if (!newMessage.trim() || !selectedContactId || sending) return;
+
+    try {
+        setSending(true);
+        const payload = {
+            to: selectedContactId,
+            content: newMessage
+        };
+        await api.post('/api/whatsapp/messages/send', payload);
+        setNewMessage("");
+        fetchMessages(); // Refresh UI
+    } catch (err) {
+        console.error("Failed to send WhatsApp message:", err);
+    } finally {
+        setSending(false);
+    }
+  };
 
   // Layout Styles - Official WhatsApp Dark Charcoal Theme
   const themes = {
@@ -420,10 +452,17 @@ const WhatsApp = () => {
                 type="text" 
                 placeholder="Type a message"
                 className="flex-1 bg-[#2a3942] rounded-lg border-none outline-none py-2.5 px-4 text-sm text-[#e9edef] placeholder:text-[#8696a0]"
-                readOnly
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={handleSendMessage}
+                disabled={sending}
               />
               <div className="text-[#8696a0]">
-                 <Mic size={24} className="cursor-pointer hover:text-white" />
+                 {newMessage.trim() ? (
+                    <Send size={24} className="text-[#00a884] cursor-pointer" onClick={() => handleSendMessage()} />
+                 ) : (
+                    <Mic size={24} className="cursor-pointer hover:text-white" />
+                 )}
               </div>
             </div>
           </>

@@ -13,6 +13,8 @@ const defaultConfig = {
     OPENAI_API_KEY: '',
     VITE_GOOGLE_MAPS_API_KEY: '',
     WHATSAPP_PHONE_NUMBER: '',
+    WHATSAPP_ACCESS_TOKEN: '',
+    WHATSAPP_PHONE_NUMBER_ID: '',
   },
 };
 
@@ -48,6 +50,8 @@ const Configuration = () => {
             OPENAI_API_KEY: envKeys.OPENAI_API_KEY || '',
             VITE_GOOGLE_MAPS_API_KEY: envKeys.VITE_GOOGLE_MAPS_API_KEY || '',
             WHATSAPP_PHONE_NUMBER: envKeys.WHATSAPP_PHONE_NUMBER || '',
+            WHATSAPP_ACCESS_TOKEN: envKeys.WHATSAPP_ACCESS_TOKEN || '',
+            WHATSAPP_PHONE_NUMBER_ID: envKeys.WHATSAPP_PHONE_NUMBER_ID || '',
           },
         });
       } catch (e) {
@@ -153,6 +157,8 @@ const Configuration = () => {
     { key: 'OPENAI_API_KEY', label: 'OpenAI API Key', icon: <Brain size={16} />, hint: 'Secret key from platform.openai.com' },
     { key: 'VITE_GOOGLE_MAPS_API_KEY', label: 'Google Maps API Key', icon: <Map size={16} />, hint: 'API key with Maps JavaScript & Directions APIs enabled' },
     { key: 'WHATSAPP_PHONE_NUMBER', label: 'WhatsApp Owner Phone', icon: <MessageSquare size={16} />, hint: 'Your phone number in international format (+33123456789)' },
+    { key: 'WHATSAPP_ACCESS_TOKEN', label: 'WhatsApp Access Token', icon: <Key size={16} />, hint: 'Permanent token from Meta App Dashboard' },
+    { key: 'WHATSAPP_PHONE_NUMBER_ID', label: 'WhatsApp Phone ID', icon: <MessageSquare size={16} />, hint: 'Unique ID for your business phone number' },
   ];
 
   return (
@@ -329,6 +335,29 @@ const Configuration = () => {
           </h2>
         </div>
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          {/* Meta for Developers (WhatsApp) */}
+          <a
+            href="https://developers.facebook.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center gap-4 p-5 rounded-xl bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-100 hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5"
+          >
+            <div className="p-3 bg-white rounded-xl shadow-sm">
+              <MessageSquare size={24} className="text-blue-600" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-gray-800">Meta for Developers</span>
+                <ExternalLink size={14} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Manage your WhatsApp App, Phone Number ID, and Access Tokens</p>
+              <div className="flex gap-1.5 mt-1.5">
+                <code className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-mono font-semibold">→ WHATSAPP_ACCESS_TOKEN</code>
+                <code className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-mono font-semibold">→ WHATSAPP_PHONE_NUMBER_ID</code>
+              </div>
+            </div>
+          </a>
 
           {/* OpenAI API Keys Link */}
           <a

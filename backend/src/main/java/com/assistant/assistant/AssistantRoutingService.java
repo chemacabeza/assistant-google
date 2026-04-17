@@ -4,6 +4,7 @@ import com.assistant.calendar.CalendarService;
 import com.assistant.contacts.ContactsService;
 import com.assistant.gmail.GmailService;
 import com.assistant.maps.MapsService;
+import com.assistant.whatsapp.WhatsAppService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -30,6 +31,7 @@ public class AssistantRoutingService {
     private final CalendarService calendarService;
     private final MapsService mapsService;
     private final ContactsService contactsService;
+    private final WhatsAppService whatsappService;
     private final ObjectMapper objectMapper;
 
     // Define the rigid JSON schema for tools available to the Assistant
@@ -128,15 +130,28 @@ public class AssistantRoutingService {
                 ),
                 "required", List.of("eventId")
             )
+        )),
+        Map.of("type", "function", "function", Map.of(
+            "name", "send_whatsapp_message",
+            "description", "Sends a WhatsApp text message to a specific phone number using the integrated WhatsApp service.",
+            "parameters", Map.of(
+                "type", "object",
+                "properties", Map.of(
+                    "to", Map.of("type", "string", "description", "The recipient's phone number in international format (e.g., +33123456789)"),
+                    "content", Map.of("type", "string", "description", "The plain text content of the message")
+                ),
+                "required", List.of("to", "content")
+            )
         ))
     );
 
-    public AssistantRoutingService(WebClient.Builder webClientBuilder, GmailService gmailService, CalendarService calendarService, MapsService mapsService, ContactsService contactsService, ObjectMapper objectMapper) {
+    public AssistantRoutingService(WebClient.Builder webClientBuilder, GmailService gmailService, CalendarService calendarService, MapsService mapsService, ContactsService contactsService, WhatsAppService whatsappService, ObjectMapper objectMapper) {
         this.webClient = webClientBuilder.build();
         this.gmailService = gmailService;
         this.calendarService = calendarService;
         this.mapsService = mapsService;
         this.contactsService = contactsService;
+        this.whatsappService = whatsappService;
         this.objectMapper = objectMapper;
     }
 
@@ -371,6 +386,11 @@ public class AssistantRoutingService {
                 String eventId = (String) args.get("eventId");
                 calendarService.deleteEvent(eventId);
                 return Map.of("success", true, "message", "Event deleted successfully");
+            } else if ("send_whatsapp_message".equals(name)) {
+                String to = (String) args.get("to");
+                String content = (String) args.get("content");
+                whatsappService.sendTextMessage(to, content);
+                return Map.of("success", true, "message", "WhatsApp message sent to " + to);
             }
         } catch (Exception e) {
             e.printStackTrace();

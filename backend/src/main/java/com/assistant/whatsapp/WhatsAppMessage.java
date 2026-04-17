@@ -35,6 +35,16 @@ public class WhatsAppMessage {
     @Column(updatable = false)
     private LocalDateTime timestamp;
 
+    @Column(columnDefinition = "TEXT")
+    private String repliedToContent;
+
+    private Boolean isEdited = false;
+
+    @Column(columnDefinition = "TEXT")
+    private String mediaMetadata;
+
+    private String recipientId;
+
     public WhatsAppMessage() {}
 
     public WhatsAppMessage(User user, String senderId, String senderName, String content, String direction, String messageSid) {
