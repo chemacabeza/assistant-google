@@ -10,6 +10,7 @@ import Gmail from './pages/Gmail';
 import Calendar from './pages/Calendar';
 import Templates from './pages/Templates';
 import Maps from './pages/Maps';
+import WhatsApp from './pages/WhatsApp';
 import Configuration from './pages/Configuration';
 import Settings from './pages/Settings';
 
@@ -37,6 +38,7 @@ function App() {
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/templates" element={<Templates />} />
               <Route path="/maps" element={<Maps />} />
+              <Route path="/whatsapp" element={<WhatsApp />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/configuration" element={<Configuration />} />
               

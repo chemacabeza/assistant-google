@@ -30,6 +30,10 @@ echo "   🚀 Running Vite build..."
 npm run build
 cd ..
 
+# 2.5 Backend Compilation
+echo "☕ Compiling backend (Maven)..."
+mvn clean package -DskipTests -f backend/pom.xml
+
 # 3. Build the final production images
 echo "🐳 Building production Docker images..."
 docker compose build
