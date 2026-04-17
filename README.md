@@ -124,7 +124,7 @@ To achieve real-time mirroring of your WhatsApp session, you must link your acco
 3.  **Identity Configuration**:
     *   The application identifies your messages (the "You" / "Moi" label) based on your configured phone number.
     *   **Easy Way**: Open the application at `http://localhost:5173/configuration`.
-    *   Under the **WhatsApp Owner Phone** field, enter your number in international format: `+33 123456789`.
+    *   Under the **WhatsApp Owner Phone** field, enter your number in international format: `+33123456789`.
     *   Save and restart the containers.
 4.  **Verification**:
     *   Ensure your Meta Business account is **Verified** in the [Security Center](https://business.facebook.com/latest/settings/security_center) to prevent service interruptions.
