@@ -1,14 +1,8 @@
-FROM node:20 AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-ARG VITE_GOOGLE_MAPS_API_KEY
-ENV VITE_GOOGLE_MAPS_API_KEY=$VITE_GOOGLE_MAPS_API_KEY
-RUN npx vite build
-
 FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
+
+# The 'dist' folder is expected to be built on the host prior to docker build
+COPY dist /usr/share/nginx/html
+
 # React router fallback configuration
 RUN echo 'server { \
     listen 80; \

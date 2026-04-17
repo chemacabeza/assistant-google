@@ -1,4 +1,6 @@
-node_modules
-dist
+# node_modules (allowed for host-context build strategy)
+# node_modules
+# dist (allowed for build-then-copy strategy)
+# dist
 .env
 .DS_Store
