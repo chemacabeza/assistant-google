@@ -202,27 +202,4 @@ public class WhatsAppBridgeController {
         // Fallback: serve from DB (previously synced messages)
         return ResponseEntity.ok(messageRepository.findByChatIdOrderByTimestampAsc(chatId));
     }
-
-    // ─── Frontend API: Send Message ───────────────────────────────────────────
-
-    @PostMapping("/messages/send")
-    public ResponseEntity<Object> sendMessage(@RequestBody Map<String, String> body) {
-        String to      = body.get("to");
-        String content = body.get("content");
-        if (to == null || content == null) return ResponseEntity.badRequest().build();
-        try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> result = webClient.post()
-                .uri(bridgeUrl + "/send")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of("to", to, "content", content))
-                .retrieve()
-                .bodyToMono(Map.class)
-                .block(java.time.Duration.ofSeconds(10));
-            return ResponseEntity.ok(result != null ? result : Map.of("success", true));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(Map.of("error", e.getMessage()));
-        }
-    }
 }
