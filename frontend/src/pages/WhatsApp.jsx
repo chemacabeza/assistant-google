@@ -74,7 +74,7 @@ const Avatar = ({ chat, size = 12 }) => {
 };
 
 // ─── QR Overlay ───────────────────────────────────────────────────────────────
-const QrOverlay = ({ bridgeStatus, onRefresh }) => (
+const QrOverlay = ({ bridgeStatus, qrDataUrl, onRefresh }) => (
   <div className="flex-1 flex flex-col items-center justify-center gap-6 p-8 bg-[#0b141a]">
     <div className="text-center space-y-2">
       <h2 className="text-2xl font-light text-[#e9edef]">Link your WhatsApp</h2>
@@ -93,12 +93,17 @@ const QrOverlay = ({ bridgeStatus, onRefresh }) => (
     {bridgeStatus === 'qr' && (
       <div className="flex flex-col items-center gap-4">
         <div className="p-4 bg-white rounded-2xl shadow-2xl">
-          <img
-            src="/api/whatsapp/bridge/qr"
-            alt="WhatsApp QR Code"
-            className="w-56 h-56"
-            key={Date.now()}
-          />
+          {qrDataUrl ? (
+            <img
+              src={qrDataUrl}
+              alt="WhatsApp QR Code"
+              className="w-64 h-64"
+            />
+          ) : (
+            <div className="w-64 h-64 flex items-center justify-center">
+              <Loader2 size={40} className="animate-spin text-[#00a884]" />
+            </div>
+          )}
         </div>
         <ol className="text-[#8696a0] text-sm space-y-1.5 text-left list-decimal list-inside max-w-xs">
           <li>Open WhatsApp on your phone</li>
@@ -225,16 +230,19 @@ const WhatsApp = () => {
   const [loading, setLoading]       = useState(true);
   const [bridgeStatus, setBridgeStatus] = useState('loading'); // loading | qr | ready | offline
   const [activeFilter, setActiveFilter] = useState('All');
+  const [qrDataUrl, setQrDataUrl]   = useState(null);
   const messagesEndRef = useRef(null);
   const pollRef = useRef(null);
+  const qrBlobRef = useRef(null); // track object URLs to revoke them
 
   // ─── Bridge status check ─────────────────────────────────────────────────
   const checkBridge = useCallback(async () => {
     try {
-      const res = await api.get('/api/whatsapp/bridge/status', { timeout: 3000 });
+      const res = await api.get('/api/whatsapp/bridge/status', { timeout: 5000 });
       const { authenticated, ready, hasQr } = res.data;
       if (ready) {
         setBridgeStatus('ready');
+        setQrDataUrl(null);
       } else if (hasQr) {
         setBridgeStatus('qr');
       } else if (authenticated) {
@@ -244,6 +252,21 @@ const WhatsApp = () => {
       }
     } catch {
       setBridgeStatus('offline');
+    }
+  }, []);
+
+  // ─── Fetch QR as blob (so session cookie is sent via axios) ──────────────
+  const fetchQr = useCallback(async () => {
+    try {
+      const res = await api.get('/api/whatsapp/bridge/qr', { responseType: 'blob', timeout: 8000 });
+      if (res.status === 200 && res.data.size > 0) {
+        if (qrBlobRef.current) URL.revokeObjectURL(qrBlobRef.current);
+        const url = URL.createObjectURL(res.data);
+        qrBlobRef.current = url;
+        setQrDataUrl(url);
+      }
+    } catch {
+      // QR not ready yet — ignore
     }
   }, []);
 
@@ -283,6 +306,17 @@ const WhatsApp = () => {
 
     return () => clearInterval(pollRef.current);
   }, [checkBridge, fetchChats]);
+
+  // Fetch QR whenever bridgeStatus becomes 'qr', and auto-refresh every 25s
+  useEffect(() => {
+    if (bridgeStatus !== 'qr') return;
+    fetchQr();
+    const qrTimer = setInterval(fetchQr, 25000);
+    return () => {
+      clearInterval(qrTimer);
+      if (qrBlobRef.current) { URL.revokeObjectURL(qrBlobRef.current); qrBlobRef.current = null; }
+    };
+  }, [bridgeStatus, fetchQr]);
 
   useEffect(() => {
     if (selectedChat) fetchMessages(selectedChat.chatId);
@@ -430,7 +464,7 @@ const WhatsApp = () => {
           style={{ backgroundImage: 'url("https://w0.peakpx.com/wallpaper/818/148/HD-wallpaper-whatsapp-dark-background-whatsapp-doodle-patterns-thumbnail.jpg")', backgroundSize: '400px' }} />
 
         {bridgeStatus !== 'ready' && !selectedChat ? (
-          <QrOverlay bridgeStatus={bridgeStatus} onRefresh={checkBridge} />
+          <QrOverlay bridgeStatus={bridgeStatus} qrDataUrl={qrDataUrl} onRefresh={() => { checkBridge(); fetchQr(); }} />
         ) : selectedChat ? (
           <>
             {/* Chat header */}
