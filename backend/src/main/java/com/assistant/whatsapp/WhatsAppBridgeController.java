@@ -183,7 +183,7 @@ public class WhatsAppBridgeController {
 
     // ─── Frontend API: Get Messages for a Chat ────────────────────────────────
 
-    @GetMapping("/chats/{chatId}/messages")
+    @GetMapping("/chats/{chatId:.+}/messages")
     public List<WhatsAppMessage> getMessagesForChat(@PathVariable String chatId) {
         return messageRepository.findByChatIdOrderByTimestampAsc(chatId);
     }
