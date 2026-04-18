@@ -184,7 +184,45 @@ public class WhatsAppBridgeController {
     // ─── Frontend API: Get Messages for a Chat ────────────────────────────────
 
     @GetMapping("/chats/{chatId:.+}/messages")
-    public List<WhatsAppMessage> getMessagesForChat(@PathVariable String chatId) {
-        return messageRepository.findByChatIdOrderByTimestampAsc(chatId);
+    public ResponseEntity<Object> getMessagesForChat(@PathVariable String chatId) {
+        // First try the bridge directly (live, no DB lag)
+        try {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> bridgeMsgs = webClient.get()
+                .uri(bridgeUrl + "/messages/" + java.net.URLEncoder.encode(chatId, java.nio.charset.StandardCharsets.UTF_8))
+                .retrieve()
+                .bodyToMono(List.class)
+                .block(java.time.Duration.ofSeconds(15));
+            if (bridgeMsgs != null && !bridgeMsgs.isEmpty()) {
+                return ResponseEntity.ok(bridgeMsgs);
+            }
+        } catch (Exception e) {
+            // Bridge unavailable or fetchMessages failed — fall through to DB
+        }
+        // Fallback: serve from DB (previously synced messages)
+        return ResponseEntity.ok(messageRepository.findByChatIdOrderByTimestampAsc(chatId));
+    }
+
+    // ─── Frontend API: Send Message ───────────────────────────────────────────
+
+    @PostMapping("/messages/send")
+    public ResponseEntity<Object> sendMessage(@RequestBody Map<String, String> body) {
+        String to      = body.get("to");
+        String content = body.get("content");
+        if (to == null || content == null) return ResponseEntity.badRequest().build();
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = webClient.post()
+                .uri(bridgeUrl + "/send")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("to", to, "content", content))
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block(java.time.Duration.ofSeconds(10));
+            return ResponseEntity.ok(result != null ? result : Map.of("success", true));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("error", e.getMessage()));
+        }
     }
 }

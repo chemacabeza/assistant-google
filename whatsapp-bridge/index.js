@@ -298,6 +298,57 @@ app.get('/status', (_, res) => res.json({
   authenticated: isAuthenticated, ready: isReady, hasQr: !!currentQrDataUrl,
 }));
 
+// ─── On-demand messages fetch ────────────────────────────────────────────────
+app.get('/messages/:chatId', async (req, res) => {
+  if (!isReady) return res.status(503).json({ error:'Bridge not ready' });
+  const { chatId } = req.params;
+  try {
+    const chat = await client.getChatById(chatId);
+    if (!chat) return res.status(404).json({ error:'Chat not found' });
+
+    let msgs = [];
+    try {
+      msgs = await chat.fetchMessages({ limit: 100 });
+    } catch (err) {
+      console.warn(`[Bridge] fetchMessages error for ${chatId}:`, err.message);
+    }
+
+    const result = msgs.map(m => ({
+      id:        m.id?._serialized || '',
+      chatId,
+      body:      m.body || '',
+      type:      m.type || 'chat',
+      fromMe:    m.fromMe,
+      from:      m.from || '',
+      timestamp: m.timestamp || 0,
+      hasMedia:  m.hasMedia || false,
+      mediaType: m.type && m.type !== 'chat' ? m.type.toUpperCase() : null,
+    }));
+
+    // Sync to DB in background
+    msgs.forEach(msg => syncMessage(msg, chat, chatId).catch(() => {}));
+
+    res.json(result);
+  } catch (err) {
+    console.error(`[Bridge] /messages/${chatId} error:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Send a message ───────────────────────────────────────────────────────────
+app.post('/send', async (req, res) => {
+  if (!isReady) return res.status(503).json({ error:'Bridge not ready' });
+  const { to, content } = req.body;
+  if (!to || !content) return res.status(400).json({ error:'to and content required' });
+  try {
+    const msg = await client.sendMessage(to, content);
+    res.json({ success:true, messageId: msg.id._serialized });
+  } catch (err) {
+    console.error('[Bridge] /send error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[Bridge] HTTP server listening on port ${PORT}`);
@@ -306,3 +357,4 @@ app.listen(PORT, '0.0.0.0', () => {
 
 console.log('[Bridge] Initializing WhatsApp client...');
 client.initialize();
+
