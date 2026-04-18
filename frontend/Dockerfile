@@ -16,9 +16,21 @@ RUN echo 'server { \
         proxy_read_timeout 300s; \
         proxy_connect_timeout 60s; \
         proxy_send_timeout 300s; \
+        proxy_set_header Host $host; \
+        proxy_set_header X-Real-IP $remote_addr; \
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
+        proxy_set_header X-Forwarded-Proto $scheme; \
+        proxy_next_upstream error timeout http_502 http_503; \
+        proxy_next_upstream_tries 3; \
     } \
     location /oauth2/ { \
         proxy_pass http://backend:8080/oauth2/; \
+        proxy_set_header Host $host; \
+        proxy_set_header X-Real-IP $remote_addr; \
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
+        proxy_set_header X-Forwarded-Proto $scheme; \
+        proxy_next_upstream error timeout http_502 http_503; \
+        proxy_next_upstream_tries 3; \
     } \
     location /login/oauth2/ { \
         proxy_pass http://backend:8080/login/oauth2/; \
@@ -26,14 +38,8 @@ RUN echo 'server { \
         proxy_set_header X-Real-IP $remote_addr; \
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
         proxy_set_header X-Forwarded-Proto $scheme; \
-    } \
-    location /api/whatsapp/bridge/qr { \
-        proxy_pass http://whatsapp-bridge:3001/qr; \
-        proxy_read_timeout 30s; \
-    } \
-    location /api/whatsapp/bridge/status { \
-        proxy_pass http://whatsapp-bridge:3001/status; \
-        proxy_read_timeout 10s; \
+        proxy_next_upstream error timeout http_502 http_503; \
+        proxy_next_upstream_tries 3; \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
