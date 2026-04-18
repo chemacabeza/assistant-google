@@ -15,6 +15,7 @@ const defaultConfig = {
     WHATSAPP_PHONE_NUMBER: '',
     WHATSAPP_ACCESS_TOKEN: '',
     WHATSAPP_PHONE_NUMBER_ID: '',
+    WHATSAPP_VERIFY_TOKEN: '',
   },
 };
 
@@ -52,6 +53,7 @@ const Configuration = () => {
             WHATSAPP_PHONE_NUMBER: envKeys.WHATSAPP_PHONE_NUMBER || '',
             WHATSAPP_ACCESS_TOKEN: envKeys.WHATSAPP_ACCESS_TOKEN || '',
             WHATSAPP_PHONE_NUMBER_ID: envKeys.WHATSAPP_PHONE_NUMBER_ID || '',
+            WHATSAPP_VERIFY_TOKEN: envKeys.WHATSAPP_VERIFY_TOKEN || '',
           },
         });
       } catch (e) {
@@ -159,6 +161,7 @@ const Configuration = () => {
     { key: 'WHATSAPP_PHONE_NUMBER', label: 'WhatsApp Owner Phone', icon: <MessageSquare size={16} />, hint: 'Your phone number in international format (+33123456789)' },
     { key: 'WHATSAPP_ACCESS_TOKEN', label: 'WhatsApp Access Token', icon: <Key size={16} />, hint: 'Permanent token from Meta App Dashboard' },
     { key: 'WHATSAPP_PHONE_NUMBER_ID', label: 'WhatsApp Phone ID', icon: <MessageSquare size={16} />, hint: 'Unique ID for your business phone number' },
+    { key: 'WHATSAPP_VERIFY_TOKEN', label: 'WhatsApp Verify Token', icon: <Shield size={16} />, hint: 'Custom string used to verify the Meta webhook callback' },
   ];
 
   return (
@@ -352,9 +355,10 @@ const Configuration = () => {
                 <ExternalLink size={14} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
               </div>
               <p className="text-xs text-slate-500 mt-1">Manage your WhatsApp App, Phone Number ID, and Access Tokens</p>
-              <div className="flex gap-1.5 mt-1.5">
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
                 <code className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-mono font-semibold">→ WHATSAPP_ACCESS_TOKEN</code>
                 <code className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-mono font-semibold">→ WHATSAPP_PHONE_NUMBER_ID</code>
+                <code className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-mono font-semibold">→ WHATSAPP_VERIFY_TOKEN</code>
               </div>
             </div>
           </a>

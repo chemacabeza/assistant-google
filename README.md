@@ -112,22 +112,40 @@ Once the stack is started, access your live deployment via `http://localhost:517
 
 ### 3. Meta Business (WhatsApp) Configuration
 
-To achieve real-time mirroring of your WhatsApp session, you must link your account via Meta's Business Suite:
+To enable the WhatsApp integration, you need three tokens from Meta's developer platform:
+
+| Environment Variable | Purpose | Where to Get It |
+| :--- | :--- | :--- |
+| `WHATSAPP_ACCESS_TOKEN` | Authenticates API calls to the WhatsApp Cloud API | [Meta App Dashboard → WhatsApp → API Setup](https://developers.facebook.com/apps/) |
+| `WHATSAPP_PHONE_NUMBER_ID` | Identifies your business phone number for sending/receiving | [Meta App Dashboard → WhatsApp → API Setup](https://developers.facebook.com/apps/) |
+| `WHATSAPP_VERIFY_TOKEN` | A custom secret string you define to verify webhook handshakes | You choose this value yourself (any string) |
+
+#### Step-by-step Setup
 
 1.  **Create a Meta App**:
-    *   Go to the [Meta for Developers](https://developers.facebook.com/) portal.
-    *   Create a "Business" type app and add the **WhatsApp** product.
-2.  **Webhook Setup**:
-    *   Set the Webhook URL to: `https://your-domain.ngrok-free.app/api/whatsapp/webhook`
-    *   Set the **Verify Token** to: `chema_assistant_2026` (as defined in `WhatsAppWebhookController`).
-    *   Subscribe to the `messages` field.
-3.  **Identity Configuration**:
-    *   The application identifies your messages (the "You" / "Moi" label) based on your configured phone number.
-    *   **Easy Way**: Open the application at `http://localhost:5173/configuration`.
-    *   Under the **WhatsApp Owner Phone** field, enter your number in international format: `+33123456789`.
-    *   Save and restart the containers.
-4.  **Verification**:
-    *   Ensure your Meta Business account is **Verified** in the [Security Center](https://business.facebook.com/latest/settings/security_center) to prevent service interruptions.
+    *   Go to the [Meta for Developers](https://developers.facebook.com/) portal and log in.
+    *   Click [**Create App**](https://developers.facebook.com/apps/create/) → select **Business** type → add the **WhatsApp** product.
+
+2.  **Get your Access Token and Phone Number ID**:
+    *   In your app dashboard, navigate to **WhatsApp → API Setup** (left sidebar).
+    *   You will see a **Temporary Access Token** — click **Generate** to create one. For a permanent token, go to [**Business Settings → System Users**](https://business.facebook.com/settings/system-users/) and generate a permanent token with `whatsapp_business_messaging` permission.
+    *   On the same API Setup page, your **Phone Number ID** is displayed under the "From" phone number dropdown.
+
+3.  **Configure the Webhook** (for receiving incoming messages):
+    *   In your app dashboard, go to **WhatsApp → Configuration**.
+    *   Set the **Callback URL** to: `https://your-domain.ngrok-free.app/api/whatsapp/webhook`
+    *   Set the **Verify Token** to any custom string you choose (e.g., `my_secret_token_2026`).
+    *   Use the same value as your `WHATSAPP_VERIFY_TOKEN` in the `.env` file.
+    *   Subscribe to the **messages** field.
+
+4.  **Set your Owner Phone Number**:
+    *   Open the application at `http://localhost:5173/configuration`.
+    *   Under **WhatsApp Owner Phone**, enter your number in international format: `+33123456789`.
+    *   All four WhatsApp keys can also be configured from the same page.
+
+5.  **Business Verification** (recommended):
+    *   To prevent service interruptions, verify your Meta Business account in the [Security Center](https://business.facebook.com/latest/settings/security_center).
+
 
 ## Security & Privacy Considerations
 

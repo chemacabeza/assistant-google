@@ -45,7 +45,8 @@ public class ConfigController {
         Set<String> configurableKeys = Set.of(
             "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
             "OPENAI_API_KEY", "VITE_GOOGLE_MAPS_API_KEY",
-            "WHATSAPP_PHONE_NUMBER", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"
+            "WHATSAPP_PHONE_NUMBER", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID",
+            "WHATSAPP_VERIFY_TOKEN"
         );
 
         try {
@@ -83,7 +84,8 @@ public class ConfigController {
         Set<String> configurableKeys = Set.of(
             "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
             "OPENAI_API_KEY", "VITE_GOOGLE_MAPS_API_KEY",
-            "WHATSAPP_PHONE_NUMBER", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"
+            "WHATSAPP_PHONE_NUMBER", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID",
+            "WHATSAPP_VERIFY_TOKEN"
         );
 
         try {
