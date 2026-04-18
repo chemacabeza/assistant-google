@@ -1,451 +1,573 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, {
+  useState, useEffect, useMemo, useRef, useCallback,
+} from 'react';
 import {
   Search, MoreVertical, Send, Paperclip, Smile, Mic, User,
   CheckCheck, ShieldCheck, Globe, Loader2, X, RefreshCw,
-  Image as ImageIcon, FileText, Volume2, Video, Phone, Info
+  Image as ImageIcon, FileText, Volume2, Video, Phone, Info,
+  MessageSquarePlus, Users2, CircleDot, Edit3, ChevronDown,
+  Star, Filter,
 } from 'lucide-react';
 import { api } from '../api/axios';
 
-// ─── Theme: Official WhatsApp Dark ───────────────────────────────────────────
-const T = {
-  bg:        'bg-[#0b141a]',
-  sidebar:   'bg-[#111b21]',
-  header:    'bg-[#202c33]',
-  bubbleIn:  'bg-[#202c33]',
-  bubbleOut: 'bg-[#005c4b]',
-  textP:     'text-[#e9edef]',
-  textS:     'text-[#8696a0]',
-  accent:    'text-[#00a884]',
-  border:    'border-[#222d34]',
-  input:     'bg-[#2a3942]',
+/* ─── Palette (exact WhatsApp dark) ──────────────────────────────────────── */
+const C = {
+  bg:       '#0b141a',
+  panel:    '#111b21',
+  header:   '#202c33',
+  hover:    '#2a3942',
+  active:   '#2a3942',
+  divider:  '#222d34',
+  inputBg:  '#2a3942',
+  bubbleIn: '#202c33',
+  bubbleOut:'#005c4b',
+  textPri:  '#e9edef',
+  textSec:  '#8696a0',
+  green:    '#00a884',
+  blue:     '#53bdeb',
 };
 
-const AVATAR_COLORS = [
-  '#00a884','#dfa62f','#128c7e','#075e54',
-  '#3b82f6','#9333ea','#ef4444','#f97316',
+const AVATAR_PALETTE = [
+  '#d9fdd3','#c3f0fb','#f0d3fd','#fdead3',
+  '#d3fde9','#fdd3d3','#e8d3fd','#d3e8fd',
+];
+const BG_PALETTE = [
+  '#00a884','#128c7e','#dfa62f','#3b82f6',
+  '#9333ea','#ef4444','#f97316','#0ea5e9',
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const avatarColor = (id = '') =>
-  AVATAR_COLORS[id.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
+const avatarBg  = (id = '') =>
+  BG_PALETTE[id.split('').reduce((a,c) => a + c.charCodeAt(0), 0) % BG_PALETTE.length];
 
+/* ─── Timestamp formatter ─────────────────────────────────────────────────── */
 const fmtTime = (ts) => {
   if (!ts) return '';
   const d = new Date(ts);
   const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  if (isToday) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (d.toDateString() === now.toDateString())
+    return d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', hour12:false });
   const diff = Math.floor((now - d) / 86400000);
   if (diff === 1) return 'Yesterday';
-  if (diff < 7)  return d.toLocaleDateString([], { weekday: 'short' });
-  return d.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
+  if (diff < 7)  return d.toLocaleDateString([], { weekday:'short' });
+  return d.toLocaleDateString([], { day:'2-digit', month:'2-digit', year:'2-digit' });
 };
 
+/* ─── Date divider for message groups ────────────────────────────────────── */
+const fmtDateDivider = (ts) => {
+  if (!ts) return '';
+  const d   = new Date(ts);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return 'Today';
+  const diff = Math.floor((now - d) / 86400000);
+  if (diff === 1) return 'Yesterday';
+  return d.toLocaleDateString([], { day:'numeric', month:'long', year:'numeric' });
+};
+
+/* ─── Media icon helper ──────────────────────────────────────────────────── */
 const mediaIcon = (type) => {
   if (!type) return null;
   const t = type.toUpperCase();
-  if (t === 'IMAGE' || t === 'STICKER') return <ImageIcon size={13} />;
-  if (t === 'VIDEO') return <Video size={13} />;
-  if (t === 'AUDIO' || t === 'PTT') return <Volume2 size={13} />;
-  return <FileText size={13} />;
+  if (t === 'IMAGE' || t === 'STICKER') return <ImageIcon size={14} />;
+  if (t === 'VIDEO')  return <Video  size={14} />;
+  if (t === 'AUDIO' || t === 'PTT')    return <Volume2 size={14} />;
+  return <FileText size={14} />;
 };
 
-// ─── Avatar Component ─────────────────────────────────────────────────────────
-const Avatar = ({ chat, size = 12 }) => {
-  const s = `w-${size} h-${size}`;
-  if (chat?.avatarUrl) {
+/* ─── Avatar ──────────────────────────────────────────────────────────────── */
+const Avatar = ({ src, name, id, size = 40 }) => {
+  const [err, setErr] = useState(false);
+  const letter = (name || '?')[0].toUpperCase();
+  const bg = avatarBg(id || name || '');
+
+  if (src && !err) {
     return (
       <img
-        src={chat.avatarUrl}
-        alt={chat.name}
-        className={`${s} rounded-full object-cover flex-shrink-0`}
-        onError={(e) => { e.target.style.display = 'none'; }}
+        src={src}
+        alt={name}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+        onError={() => setErr(true)}
       />
     );
   }
-  const letter = (chat?.name || '?')[0].toUpperCase();
-  const bg = avatarColor(chat?.chatId || '');
   return (
-    <div className={`${s} rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white text-lg`}
-         style={{ backgroundColor: bg }}>
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: bg, flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontWeight: 700, fontSize: size * 0.43, color: '#fff',
+    }}>
       {letter}
     </div>
   );
 };
 
-// ─── QR Overlay ───────────────────────────────────────────────────────────────
-const QrOverlay = ({ bridgeStatus, qrDataUrl, onRefresh }) => (
-  <div className="flex-1 flex flex-col items-center justify-center gap-6 p-8 bg-[#0b141a]">
-    <div className="text-center space-y-2">
-      <h2 className="text-2xl font-light text-[#e9edef]">Link your WhatsApp</h2>
-      <p className="text-sm text-[#8696a0] max-w-xs">
+/* ─── QR / Bridge overlay ────────────────────────────────────────────────── */
+const BridgeOverlay = ({ status, qrUrl, onRetry, onRefreshQr }) => (
+  <div style={{
+    flex: 1, display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center',
+    background: C.bg, gap: 24,
+  }}>
+    <div style={{ textAlign: 'center' }}>
+      <h2 style={{ color: C.textPri, fontSize: 22, fontWeight: 300, margin: 0 }}>
+        Link your WhatsApp
+      </h2>
+      <p style={{ color: C.textSec, fontSize: 13, marginTop: 6, maxWidth: 320 }}>
         Scan this QR code with WhatsApp on your phone to mirror all your conversations.
       </p>
     </div>
 
-    {bridgeStatus === 'loading' && (
-      <div className="flex flex-col items-center gap-3">
-        <Loader2 size={48} className="animate-spin text-[#00a884]" />
-        <p className="text-[#8696a0] text-sm">Starting WhatsApp bridge…</p>
+    {status === 'loading' && (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <Loader2 size={48} color={C.green} style={{ animation: 'spin 1s linear infinite' }} />
+        <p style={{ color: C.textSec, fontSize: 13 }}>Starting WhatsApp bridge…</p>
       </div>
     )}
 
-    {bridgeStatus === 'qr' && (
-      <div className="flex flex-col items-center gap-4">
-        <div className="p-4 bg-white rounded-2xl shadow-2xl">
-          {qrDataUrl ? (
-            <img
-              src={qrDataUrl}
-              alt="WhatsApp QR Code"
-              className="w-64 h-64"
-            />
-          ) : (
-            <div className="w-64 h-64 flex items-center justify-center">
-              <Loader2 size={40} className="animate-spin text-[#00a884]" />
-            </div>
-          )}
+    {status === 'qr' && (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+        <div style={{ background: '#fff', padding: 20, borderRadius: 16, boxShadow: '0 8px 32px rgba(0,0,0,.4)' }}>
+          {qrUrl
+            ? <img src={qrUrl} alt="QR" style={{ width: 260, height: 260, display: 'block' }} />
+            : <div style={{ width: 260, height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Loader2 size={40} color={C.green} style={{ animation: 'spin 1s linear infinite' }} />
+              </div>
+          }
         </div>
-        <ol className="text-[#8696a0] text-sm space-y-1.5 text-left list-decimal list-inside max-w-xs">
+        <ol style={{ color: C.textSec, fontSize: 13, lineHeight: 2, paddingLeft: 20, maxWidth: 280 }}>
           <li>Open WhatsApp on your phone</li>
-          <li>Go to <strong className="text-[#e9edef]">Settings → Linked Devices</strong></li>
-          <li>Tap <strong className="text-[#e9edef]">Link a Device</strong></li>
+          <li>Go to <strong style={{ color: C.textPri }}>Settings → Linked Devices</strong></li>
+          <li>Tap <strong style={{ color: C.textPri }}>Link a Device</strong></li>
           <li>Scan the QR code above</li>
         </ol>
-        <button onClick={onRefresh}
-          className="flex items-center gap-2 text-[#00a884] text-sm hover:underline">
-          <RefreshCw size={14} /> Refresh QR
+        <button onClick={onRefreshQr} style={{
+          background: 'none', border: 'none', color: C.green,
+          fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <RefreshCw size={13} /> Refresh QR
         </button>
       </div>
     )}
 
-    {bridgeStatus === 'offline' && (
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
-          <X size={32} className="text-red-400" />
+    {status === 'offline' && (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%',
+          background: 'rgba(239,68,68,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <X size={28} color="#ef4444" />
         </div>
-        <p className="text-[#8696a0] text-sm text-center">
+        <p style={{ color: C.textSec, fontSize: 13, textAlign: 'center' }}>
           WhatsApp bridge is offline.<br />
-          Make sure the <code className="text-[#00a884]">whatsapp-bridge</code> container is running.
+          Make sure the <code style={{ color: C.green }}>whatsapp-bridge</code> container is running.
         </p>
-        <button onClick={onRefresh}
-          className="flex items-center gap-2 px-4 py-2 bg-[#00a884] text-white rounded-full text-sm hover:bg-[#00c99c]">
-          <RefreshCw size={14} /> Retry
+        <button onClick={onRetry} style={{
+          background: C.green, border: 'none', color: '#111b21',
+          padding: '8px 20px', borderRadius: 20, fontSize: 13,
+          fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <RefreshCw size={13} /> Retry
         </button>
       </div>
     )}
   </div>
 );
 
-// ─── Message Bubble ───────────────────────────────────────────────────────────
-const MessageBubble = ({ msg }) => {
-  const isOut = msg.direction === 'OUTGOING';
-  const hasImage = msg.mediaBase64 && (msg.mediaType === 'IMAGE' || msg.mediaType === 'STICKER');
+/* ─── Message Bubble ──────────────────────────────────────────────────────── */
+const Bubble = ({ msg }) => {
+  const out = msg.direction === 'OUTGOING';
+  const hasImg   = msg.mediaBase64 && (msg.mediaType === 'IMAGE' || msg.mediaType === 'STICKER');
   const hasVideo = msg.mediaBase64 && msg.mediaType === 'VIDEO';
   const hasAudio = msg.mediaBase64 && (msg.mediaType === 'AUDIO' || msg.mediaType === 'PTT');
-
   const mediaSrc = msg.mediaBase64 && msg.mediaMimetype
-    ? `data:${msg.mediaMimetype};base64,${msg.mediaBase64}`
-    : null;
+    ? `data:${msg.mediaMimetype};base64,${msg.mediaBase64}` : null;
 
   return (
-    <div className={`flex ${isOut ? 'justify-end' : 'justify-start'} w-full mb-1`}>
-      <div className={`relative max-w-[72%] px-3 py-1.5 rounded-lg shadow-sm
-        ${isOut ? 'bg-[#005c4b] rounded-tr-none' : 'bg-[#202c33] rounded-tl-none'}`}>
-
-        {/* Group author name */}
-        {!isOut && msg.authorName && (
-          <p className="text-[12px] font-bold mb-0.5"
-             style={{ color: avatarColor(msg.authorPhone || msg.authorName) }}>
+    <div style={{
+      display: 'flex', justifyContent: out ? 'flex-end' : 'flex-start',
+      marginBottom: 2, padding: '0 60px',
+    }}>
+      <div style={{
+        maxWidth: '65%', background: out ? C.bubbleOut : C.bubbleIn,
+        borderRadius: out ? '8px 0 8px 8px' : '0 8px 8px 8px',
+        padding: '6px 9px 8px',
+        boxShadow: '0 1px 2px rgba(0,0,0,.3)',
+        position: 'relative',
+      }}>
+        {/* Group author */}
+        {!out && msg.authorName && (
+          <p style={{ fontSize: 12, fontWeight: 700, color: C.green, marginBottom: 2 }}>
             {msg.authorName}
           </p>
         )}
 
         {/* Quoted reply */}
         {msg.repliedToContent && (
-          <div className="mb-1.5 flex bg-black/20 rounded-md border-l-4 border-[#00a884] overflow-hidden">
-            <div className="p-2 py-1">
-              <p className="text-[11px] font-bold text-[#00a884]">{isOut ? 'You' : (msg.senderName || msg.senderId)}</p>
-              <p className="text-[12px] text-[#8696a0] truncate italic">{msg.repliedToContent}</p>
+          <div style={{
+            marginBottom: 6, borderRadius: 6, overflow: 'hidden',
+            borderLeft: `4px solid ${C.green}`, background: 'rgba(0,0,0,.2)',
+          }}>
+            <div style={{ padding: '4px 8px' }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: C.green, margin: 0 }}>
+                {out ? 'You' : (msg.senderName || msg.senderId)}
+              </p>
+              <p style={{ fontSize: 12, color: C.textSec, margin: 0, fontStyle: 'italic' }}>
+                {msg.repliedToContent}
+              </p>
             </div>
           </div>
         )}
 
         {/* Image */}
-        {hasImage && mediaSrc && (
-          <div className="-mx-3 -mt-1.5 mb-1 overflow-hidden rounded-t-lg">
-            <img src={mediaSrc} alt="media" className="max-h-80 w-full object-cover" />
+        {hasImg && mediaSrc && (
+          <div style={{ margin: '-6px -9px 4px', overflow: 'hidden', borderRadius: '0 8px 0 0' }}>
+            <img src={mediaSrc} alt="media" style={{ maxHeight: 320, width: '100%', objectFit: 'cover', display: 'block' }} />
           </div>
         )}
 
         {/* Video */}
         {hasVideo && mediaSrc && (
-          <div className="-mx-3 -mt-1.5 mb-1 overflow-hidden rounded-t-lg">
-            <video src={mediaSrc} controls className="max-h-64 w-full" />
+          <div style={{ margin: '-6px -9px 4px', overflow: 'hidden', borderRadius: '0 8px 0 0' }}>
+            <video src={mediaSrc} controls style={{ maxHeight: 280, width: '100%', display: 'block' }} />
           </div>
         )}
 
         {/* Audio */}
         {hasAudio && mediaSrc && (
-          <div className="flex items-center gap-2 mb-1">
-            <audio src={mediaSrc} controls className="max-w-full h-8" />
+          <div style={{ marginBottom: 4 }}>
+            <audio src={mediaSrc} controls style={{ height: 36, width: '100%' }} />
           </div>
         )}
 
-        {/* Body text */}
+        {/* Text */}
         {msg.content && (
-          <p className="text-[14px] leading-relaxed break-words pr-14 text-[#e9edef]"
-             style={{ whiteSpace: 'pre-wrap' }}>
+          <p style={{
+            fontSize: 14.2, color: C.textPri, margin: 0,
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            paddingRight: 52,
+          }}>
             {msg.content}
           </p>
         )}
 
-        {/* No text, show media placeholder label */}
-        {!msg.content && !hasImage && !hasVideo && !hasAudio && msg.mediaType && (
-          <div className="flex items-center gap-2 pr-14 text-[#8696a0] text-[13px]">
+        {/* Media-only no-text */}
+        {!msg.content && !hasImg && !hasVideo && !hasAudio && msg.mediaType && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: C.textSec, fontSize: 13, paddingRight: 48 }}>
             {mediaIcon(msg.mediaType)}
-            <span className="capitalize">{msg.mediaType.toLowerCase()}</span>
+            <span style={{ textTransform: 'capitalize' }}>{msg.mediaType.toLowerCase()}</span>
           </div>
         )}
 
-        {/* Timestamp + read receipt */}
-        <div className="absolute bottom-1 right-2 flex items-center gap-1">
-          <span className="text-[10px] text-[#8696a0cc]">
+        {/* Timestamp + tick */}
+        <div style={{
+          position: 'absolute', bottom: 4, right: 8,
+          display: 'flex', alignItems: 'center', gap: 3,
+        }}>
+          <span style={{ fontSize: 11, color: 'rgba(134,150,160,.9)', whiteSpace: 'nowrap' }}>
             {fmtTime(msg.timestamp)}
           </span>
-          {isOut && <CheckCheck size={14} className="text-[#53bdeb]" />}
+          {out && <CheckCheck size={15} color={C.blue} />}
         </div>
       </div>
     </div>
   );
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-const WhatsApp = () => {
-  const [chats, setChats]           = useState([]);
-  const [messages, setMessages]     = useState([]);
-  const [selectedChat, setSelectedChat] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [newMessage, setNewMessage] = useState('');
-  const [sending, setSending]       = useState(false);
-  const [loading, setLoading]       = useState(true);
-  const [bridgeStatus, setBridgeStatus] = useState('loading'); // loading | qr | ready | offline
-  const [activeFilter, setActiveFilter] = useState('All');
-  const [qrDataUrl, setQrDataUrl]   = useState(null);
-  const messagesEndRef = useRef(null);
-  const pollRef = useRef(null);
-  const qrBlobRef = useRef(null); // track object URLs to revoke them
+/* ─── Date divider ───────────────────────────────────────────────────────── */
+const DateDivider = ({ label }) => (
+  <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0' }}>
+    <span style={{
+      background: C.header, color: C.textSec,
+      borderRadius: 8, padding: '4px 12px', fontSize: 12,
+      boxShadow: '0 1px 2px rgba(0,0,0,.3)',
+    }}>
+      {label}
+    </span>
+  </div>
+);
 
-  // ─── Bridge status check ─────────────────────────────────────────────────
+/* ─── Main Component ─────────────────────────────────────────────────────── */
+const WhatsApp = () => {
+  const [chats, setChats]               = useState([]);
+  const [messages, setMessages]         = useState([]);
+  const [selected, setSelected]         = useState(null);
+  const [search, setSearch]             = useState('');
+  const [newMsg, setNewMsg]             = useState('');
+  const [sending, setSending]           = useState(false);
+  const [loading, setLoading]           = useState(true);
+  const [bridgeStatus, setBridgeStatus] = useState('loading');
+  const [filter, setFilter]             = useState('All');
+  const [qrUrl, setQrUrl]               = useState(null);
+
+  const endRef    = useRef(null);
+  const pollRef   = useRef(null);
+  const qrBlobRef = useRef(null);
+
+  /* ── bridge status ─────────────────────────────────────────────────────── */
   const checkBridge = useCallback(async () => {
     try {
-      const res = await api.get('/api/whatsapp/bridge/status', { timeout: 5000 });
-      const { authenticated, ready, hasQr } = res.data;
-      if (ready) {
-        setBridgeStatus('ready');
-        setQrDataUrl(null);
-      } else if (hasQr) {
-        setBridgeStatus('qr');
-      } else if (authenticated) {
-        setBridgeStatus('loading'); // authenticated but not yet ready
-      } else {
-        setBridgeStatus('qr');
-      }
-    } catch {
-      setBridgeStatus('offline');
-    }
+      const r = await api.get('/api/whatsapp/bridge/status', { timeout: 5000 });
+      const { authenticated, ready, hasQr } = r.data;
+      if (ready)          { setBridgeStatus('ready'); setQrUrl(null); }
+      else if (hasQr)     setBridgeStatus('qr');
+      else if (authenticated) setBridgeStatus('loading');
+      else                setBridgeStatus('qr');
+    } catch { setBridgeStatus('offline'); }
   }, []);
 
-  // ─── Fetch QR as blob (so session cookie is sent via axios) ──────────────
+  /* ── fetch QR ──────────────────────────────────────────────────────────── */
   const fetchQr = useCallback(async () => {
     try {
-      const res = await api.get('/api/whatsapp/bridge/qr', { responseType: 'blob', timeout: 8000 });
-      if (res.status === 200 && res.data.size > 0) {
+      const r = await api.get('/api/whatsapp/bridge/qr', { responseType: 'blob', timeout: 8000 });
+      if (r.status === 200 && r.data.size > 0) {
         if (qrBlobRef.current) URL.revokeObjectURL(qrBlobRef.current);
-        const url = URL.createObjectURL(res.data);
+        const url = URL.createObjectURL(r.data);
         qrBlobRef.current = url;
-        setQrDataUrl(url);
+        setQrUrl(url);
       }
-    } catch {
-      // QR not ready yet — ignore
-    }
+    } catch { /* not ready */ }
   }, []);
 
-  // ─── Fetch chats ─────────────────────────────────────────────────────────
+  /* ── fetch chats ───────────────────────────────────────────────────────── */
   const fetchChats = useCallback(async () => {
     try {
-      const res = await api.get('/api/whatsapp/chats');
-      setChats(res.data || []);
+      const r = await api.get('/api/whatsapp/chats');
+      setChats(r.data || []);
       setLoading(false);
-    } catch {
-      setLoading(false);
-    }
+    } catch { setLoading(false); }
   }, []);
 
-  // ─── Fetch messages for selected chat ────────────────────────────────────
+  /* ── fetch messages ────────────────────────────────────────────────────── */
   const fetchMessages = useCallback(async (chatId) => {
     if (!chatId) return;
     try {
-      const encodedId = encodeURIComponent(chatId);
-      const res = await api.get(`/api/whatsapp/chats/${encodedId}/messages`);
-      setMessages(res.data || []);
-    } catch {
-      setMessages([]);
-    }
+      const r = await api.get(`/api/whatsapp/chats/${encodeURIComponent(chatId)}/messages`);
+      setMessages(r.data || []);
+    } catch { setMessages([]); }
   }, []);
 
-  // ─── Polling ─────────────────────────────────────────────────────────────
+  /* ── polling ───────────────────────────────────────────────────────────── */
   useEffect(() => {
     checkBridge();
     fetchChats();
-
     pollRef.current = setInterval(() => {
       checkBridge();
       fetchChats();
-      if (selectedChat) fetchMessages(selectedChat.chatId);
     }, 5000);
-
     return () => clearInterval(pollRef.current);
   }, [checkBridge, fetchChats]);
 
-  // Fetch QR whenever bridgeStatus becomes 'qr', and auto-refresh every 25s
+  /* ── QR refresh every 25s ──────────────────────────────────────────────── */
   useEffect(() => {
     if (bridgeStatus !== 'qr') return;
     fetchQr();
-    const qrTimer = setInterval(fetchQr, 25000);
-    return () => {
-      clearInterval(qrTimer);
-      if (qrBlobRef.current) { URL.revokeObjectURL(qrBlobRef.current); qrBlobRef.current = null; }
-    };
+    const t = setInterval(fetchQr, 25000);
+    return () => { clearInterval(t); if (qrBlobRef.current) { URL.revokeObjectURL(qrBlobRef.current); qrBlobRef.current = null; } };
   }, [bridgeStatus, fetchQr]);
 
+  /* ── poll messages for selected chat ──────────────────────────────────── */
   useEffect(() => {
-    if (selectedChat) fetchMessages(selectedChat.chatId);
-  }, [selectedChat, fetchMessages]);
+    if (!selected) return;
+    fetchMessages(selected.chatId);
+    const t = setInterval(() => fetchMessages(selected.chatId), 5000);
+    return () => clearInterval(t);
+  }, [selected, fetchMessages]);
 
-  // Auto-scroll to bottom
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  /* ── auto-scroll ───────────────────────────────────────────────────────── */
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  // ─── Filtered chats ───────────────────────────────────────────────────────
+  /* ── filtered chats ────────────────────────────────────────────────────── */
   const filteredChats = useMemo(() => {
     return chats.filter(c => {
-      const matchSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase());
-      if (activeFilter === 'Groups') return matchSearch && c.group;
-      if (activeFilter === 'Unread') return matchSearch && c.unreadCount > 0;
-      return matchSearch;
+      const m = (c.name || '').toLowerCase().includes(search.toLowerCase());
+      if (filter === 'Unread')    return m && c.unreadCount > 0;
+      if (filter === 'Favorites') return m && c.favorite;
+      if (filter === 'Groups')    return m && c.group;
+      return m;
     });
-  }, [chats, searchTerm, activeFilter]);
+  }, [chats, search, filter]);
 
-  // ─── Send message ─────────────────────────────────────────────────────────
+  /* ── group messages by date ────────────────────────────────────────────── */
+  const groupedMessages = useMemo(() => {
+    const groups = [];
+    let lastDate = '';
+    messages.forEach(msg => {
+      const date = msg.timestamp ? new Date(msg.timestamp).toDateString() : '';
+      if (date !== lastDate) {
+        groups.push({ type: 'divider', label: fmtDateDivider(msg.timestamp), key: `d-${date}` });
+        lastDate = date;
+      }
+      groups.push({ type: 'msg', msg });
+    });
+    return groups;
+  }, [messages]);
+
+  /* ── send message ──────────────────────────────────────────────────────── */
   const handleSend = async () => {
-    if (!newMessage.trim() || !selectedChat || sending) return;
+    if (!newMsg.trim() || !selected || sending) return;
     try {
       setSending(true);
-      await api.post('/api/whatsapp/messages/send', {
-        to: selectedChat.chatId,
-        content: newMessage
-      });
-      setNewMessage('');
-      fetchMessages(selectedChat.chatId);
-    } catch (e) {
-      console.error('Send failed:', e);
-    } finally {
-      setSending(false);
-    }
+      await api.post('/api/whatsapp/messages/send', { to: selected.chatId, content: newMsg });
+      setNewMsg('');
+      fetchMessages(selected.chatId);
+    } catch (e) { console.error('Send failed', e); }
+    finally { setSending(false); }
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
-  return (
-    <div className={`h-full flex overflow-hidden rounded-xl shadow-2xl border ${T.border} ${T.bg} font-sans`}>
+  /* ── whether to show QR overlay ─────────────────────────────────────────── */
+  const showOverlay = bridgeStatus !== 'ready';
 
-      {/* ── LEFT SIDEBAR ─────────────────────────────────────────────────── */}
-      <div className={`w-[340px] min-w-[340px] flex flex-col border-r ${T.border} ${T.sidebar}`}>
+  /* ─────────────────────────────────────────────────────────────────────── */
+  return (
+    <div style={{
+      display: 'flex', height: '100%', overflow: 'hidden',
+      borderRadius: 12, boxShadow: '0 4px 32px rgba(0,0,0,.5)',
+      background: C.bg, fontFamily: "'Segoe UI', Helvetica, Arial, sans-serif",
+    }}>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          LEFT PANEL
+      ════════════════════════════════════════════════════════════════════ */}
+      <div style={{
+        width: 400, minWidth: 400, display: 'flex', flexDirection: 'column',
+        borderRight: `1px solid ${C.divider}`, background: C.panel,
+      }}>
 
         {/* Header */}
-        <div className={`h-[60px] px-4 flex items-center justify-between ${T.header}`}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#6a7175] flex items-center justify-center text-white">
-              <User size={22} />
-            </div>
-            <h1 className="text-[#e9edef] font-bold text-lg">WhatsApp</h1>
+        <div style={{
+          height: 60, background: C.header,
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', padding: '0 16px', flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Avatar src={null} name="Me" id="me" size={40} />
+            <span style={{ color: C.textPri, fontWeight: 700, fontSize: 18 }}>WhatsApp</span>
           </div>
-          <div className="flex items-center gap-2 text-[#aebac1]">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: C.textSec }}>
             {bridgeStatus !== 'ready' && (
-              <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Bridge connecting…" />
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#facc15', animation: 'pulse 2s infinite' }} />
             )}
             {bridgeStatus === 'ready' && (
-              <div className="w-2 h-2 rounded-full bg-[#00a884]" title="Connected" />
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green }} />
             )}
-            <MoreVertical size={20} className="cursor-pointer hover:text-white" />
+            <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textSec, padding: 4, borderRadius: '50%', display: 'flex', alignItems: 'center' }}
+              title="New chat"><Edit3 size={20} /></button>
+            <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textSec, padding: 4, borderRadius: '50%', display: 'flex', alignItems: 'center' }}
+              title="Menu"><MoreVertical size={20} /></button>
           </div>
         </div>
 
         {/* Search */}
-        <div className="p-2 pt-3">
-          <div className="bg-[#202c33] rounded-lg flex items-center px-3 gap-3">
-            <Search size={16} className="text-[#8696a0]" />
+        <div style={{ padding: '8px 12px 4px', flexShrink: 0 }}>
+          <div style={{
+            background: C.inputBg, borderRadius: 9,
+            display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10,
+          }}>
+            <Search size={16} color={C.textSec} />
             <input
-              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
               placeholder="Search or start new chat"
-              className="bg-transparent border-none outline-none text-sm py-2 w-full text-[#e9edef] placeholder:text-[#8696a0]"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              style={{
+                background: 'none', border: 'none', outline: 'none',
+                fontSize: 14, color: C.textPri, padding: '9px 0', width: '100%',
+              }}
             />
           </div>
         </div>
 
         {/* Filter chips */}
-        <div className="px-3 pb-2 flex gap-2 overflow-x-auto no-scrollbar">
-          {['All', 'Unread', 'Groups'].map(f => (
-            <button key={f} onClick={() => setActiveFilter(f)}
-              className={`px-4 py-1 rounded-full text-[13px] font-medium whitespace-nowrap transition-colors
-                ${activeFilter === f ? 'bg-[#00a884] text-[#111b21]' : 'bg-[#202c33] text-[#8696a0] hover:bg-[#2a3942]'}`}>
+        <div style={{ display: 'flex', gap: 6, padding: '4px 12px 8px', overflowX: 'auto', flexShrink: 0 }}>
+          {['All', 'Unread', 'Favorites', 'Groups'].map(f => (
+            <button key={f} onClick={() => setFilter(f)} style={{
+              border: 'none', borderRadius: 16, padding: '4px 12px',
+              fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
+              background: filter === f ? C.green : C.inputBg,
+              color: filter === f ? '#111b21' : C.textSec,
+              transition: 'all .15s',
+            }}>
               {f}
             </button>
           ))}
         </div>
 
         {/* Special rows */}
-        <div className={`px-4 py-3 flex items-center gap-4 hover:bg-[#202c33] cursor-pointer`}>
-          <ShieldCheck size={20} className="text-[#00a884]" />
-          <span className="text-[15px] text-[#e9edef]">Locked chats</span>
-        </div>
-        <div className={`px-4 py-3 flex items-center gap-4 hover:bg-[#202c33] cursor-pointer border-b ${T.border}`}>
-          <Globe size={18} className="text-[#8696a0]" />
-          <span className="text-[15px] text-[#e9edef]">Archived</span>
+        <div style={{ flexShrink: 0 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 16,
+            padding: '12px 16px', cursor: 'pointer',
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = C.hover}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <ShieldCheck size={20} color={C.green} />
+            <span style={{ color: C.textPri, fontSize: 15 }}>Locked chats</span>
+          </div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 16,
+            padding: '12px 16px', cursor: 'pointer',
+            borderBottom: `1px solid ${C.divider}`,
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = C.hover}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <Globe size={18} color={C.textSec} />
+            <span style={{ color: C.textPri, fontSize: 15 }}>Archived</span>
+          </div>
         </div>
 
         {/* Chat list */}
-        <div className="flex-1 overflow-y-auto">
+        <div style={{ flex: 1, overflowY: 'auto' }}>
           {loading && (
-            <div className="flex justify-center items-center p-8">
-              <Loader2 size={24} className="animate-spin text-[#00a884]" />
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
+              <Loader2 size={24} color={C.green} style={{ animation: 'spin 1s linear infinite' }} />
             </div>
           )}
           {!loading && filteredChats.length === 0 && bridgeStatus === 'ready' && (
-            <p className="text-center text-[#8696a0] text-sm p-8">No conversations found</p>
+            <p style={{ textAlign: 'center', color: C.textSec, fontSize: 14, padding: 32 }}>
+              No conversations found
+            </p>
           )}
           {filteredChats.map(chat => (
-            <div key={chat.chatId}
-              onClick={() => setSelectedChat(chat)}
-              className={`flex items-center gap-3 px-4 py-3 cursor-pointer border-b ${T.border}
-                hover:bg-[#202c33] transition-colors
-                ${selectedChat?.chatId === chat.chatId ? 'bg-[#2a3942]' : ''}`}>
-              <Avatar chat={chat} size={12} />
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-center mb-0.5">
-                  <h3 className="text-[15px] font-normal text-[#e9edef] truncate">{chat.name}</h3>
-                  <span className="text-[11px] text-[#8696a0] ml-2 flex-shrink-0">{fmtTime(chat.lastMessageTimestamp)}</span>
+            <div
+              key={chat.chatId}
+              onClick={() => setSelected(chat)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '10px 16px', cursor: 'pointer',
+                borderBottom: `1px solid ${C.divider}`,
+                background: selected?.chatId === chat.chatId ? C.active : 'transparent',
+                transition: 'background .1s',
+              }}
+              onMouseEnter={e => { if (selected?.chatId !== chat.chatId) e.currentTarget.style.background = C.hover; }}
+              onMouseLeave={e => { if (selected?.chatId !== chat.chatId) e.currentTarget.style.background = 'transparent'; }}
+            >
+              <Avatar src={chat.avatarUrl} name={chat.name} id={chat.chatId} size={49} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 }}>
+                  <span style={{ color: C.textPri, fontSize: 15.5, fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>
+                    {chat.name}
+                  </span>
+                  <span style={{ color: chat.unreadCount > 0 ? C.green : C.textSec, fontSize: 12, flexShrink: 0, marginLeft: 8 }}>
+                    {fmtTime(chat.lastMessageTimestamp)}
+                  </span>
                 </div>
-                <div className="flex items-center gap-1 min-w-0">
-                  {chat.lastMessage?.startsWith('📎') && (
-                    <Paperclip size={12} className="text-[#8696a0] flex-shrink-0" />
-                  )}
-                  <p className="text-[13px] truncate text-[#8696a0]">{chat.lastMessage || ''}</p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{
+                    color: C.textSec, fontSize: 13.5,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    maxWidth: 240, display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                    {chat.lastMessage?.startsWith('📎')
+                      ? <><Paperclip size={12} style={{ flexShrink: 0 }} />{chat.lastMessage.slice(2)}</>
+                      : chat.lastMessage || ''}
+                  </span>
                   {chat.unreadCount > 0 && (
-                    <span className="ml-auto flex-shrink-0 bg-[#00a884] text-[#111b21] text-[11px] font-bold
-                      rounded-full w-5 h-5 flex items-center justify-center">
+                    <span style={{
+                      background: C.green, color: '#111b21',
+                      fontSize: 11, fontWeight: 700,
+                      borderRadius: '50%', minWidth: 20, height: 20,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '0 4px', flexShrink: 0,
+                    }}>
                       {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
                     </span>
                   )}
@@ -456,87 +578,155 @@ const WhatsApp = () => {
         </div>
       </div>
 
-      {/* ── RIGHT PANEL ──────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col relative bg-[#0b141a]">
+      {/* ═══════════════════════════════════════════════════════════════════
+          RIGHT PANEL
+      ════════════════════════════════════════════════════════════════════ */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: C.bg, position: 'relative', overflow: 'hidden' }}>
 
-        {/* Wallpaper doodle */}
-        <div className="absolute inset-0 opacity-[0.06] pointer-events-none"
-          style={{ backgroundImage: 'url("https://w0.peakpx.com/wallpaper/818/148/HD-wallpaper-whatsapp-dark-background-whatsapp-doodle-patterns-thumbnail.jpg")', backgroundSize: '400px' }} />
+        {/* WhatsApp doodle wallpaper */}
+        <div style={{
+          position: 'absolute', inset: 0, opacity: 0.06, pointerEvents: 'none',
+          backgroundImage: 'url("https://w0.peakpx.com/wallpaper/818/148/HD-wallpaper-whatsapp-dark-background-whatsapp-doodle-patterns-thumbnail.jpg")',
+          backgroundSize: '400px',
+        }} />
 
-        {bridgeStatus !== 'ready' && !selectedChat ? (
-          <QrOverlay bridgeStatus={bridgeStatus} qrDataUrl={qrDataUrl} onRefresh={() => { checkBridge(); fetchQr(); }} />
-        ) : selectedChat ? (
+        {showOverlay ? (
+          <BridgeOverlay
+            status={bridgeStatus}
+            qrUrl={qrUrl}
+            onRetry={() => { checkBridge(); }}
+            onRefreshQr={() => { checkBridge(); fetchQr(); }}
+          />
+        ) : selected ? (
           <>
-            {/* Chat header */}
-            <div className={`h-[60px] px-4 flex items-center justify-between z-10 ${T.header} border-b ${T.border}`}>
-              <div className="flex items-center gap-3 cursor-pointer">
-                <Avatar chat={selectedChat} size={10} />
+            {/* Chat Header */}
+            <div style={{
+              height: 60, background: C.header,
+              display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between', padding: '0 16px',
+              borderBottom: `1px solid ${C.divider}`, flexShrink: 0, zIndex: 10,
+              position: 'relative',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+                <Avatar src={selected.avatarUrl} name={selected.name} id={selected.chatId} size={40} />
                 <div>
-                  <h2 className="text-[15px] font-medium text-[#e9edef]">{selectedChat.name}</h2>
-                  <p className="text-[12px] text-[#8696a0]">
-                    {selectedChat.group ? 'Group' : 'Click for contact info'}
+                  <p style={{ color: C.textPri, fontSize: 15, fontWeight: 500, margin: 0 }}>
+                    {selected.name}
+                  </p>
+                  <p style={{ color: C.textSec, fontSize: 12, margin: 0 }}>
+                    {selected.group ? 'Group' : 'click here for contact info'}
                   </p>
                 </div>
               </div>
-              <div className="flex gap-5 text-[#aebac1]">
-                <Search size={20} className="hover:text-white cursor-pointer" />
-                <Phone size={20} className="hover:text-white cursor-pointer" />
-                <Info size={20} className="hover:text-white cursor-pointer" />
-                <MoreVertical size={20} className="hover:text-white cursor-pointer" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: C.textSec }}>
+                {[Video, Phone, Search, MoreVertical].map((Icon, i) => (
+                  <button key={i} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textSec, padding: 8, borderRadius: '50%', display: 'flex' }}>
+                    <Icon size={20} />
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-12 py-4 z-10 flex flex-col">
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0', position: 'relative', zIndex: 1 }}>
               {messages.length === 0 && (
-                <div className="flex-1 flex items-center justify-center">
-                  <p className="text-[#8696a0] text-sm">No messages yet</p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                  <div style={{
+                    background: C.header, color: C.textSec,
+                    borderRadius: 8, padding: '6px 16px', fontSize: 13,
+                    boxShadow: '0 1px 2px rgba(0,0,0,.3)',
+                  }}>
+                    No messages yet
+                  </div>
                 </div>
               )}
-              {messages.map(msg => (
-                <MessageBubble key={msg.id} msg={msg} />
-              ))}
-              <div ref={messagesEndRef} />
+              {groupedMessages.map((item, i) =>
+                item.type === 'divider'
+                  ? <DateDivider key={item.key} label={item.label} />
+                  : <Bubble key={item.msg.id || i} msg={item.msg} />
+              )}
+              <div ref={endRef} />
             </div>
 
-            {/* Input */}
-            <div className="px-4 py-2 flex items-center gap-3 z-10 bg-[#202c33]">
-              <Smile size={24} className="text-[#8696a0] cursor-pointer hover:text-white flex-shrink-0" />
-              <Paperclip size={24} className="text-[#8696a0] cursor-pointer hover:text-white flex-shrink-0 -rotate-45" />
-              <input
-                type="text"
-                placeholder="Type a message"
-                className="flex-1 bg-[#2a3942] rounded-lg px-4 py-2.5 text-sm text-[#e9edef]
-                  placeholder:text-[#8696a0] border-none outline-none"
-                value={newMessage}
-                onChange={e => setNewMessage(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSend()}
-                disabled={sending}
-              />
-              {newMessage.trim() ? (
-                <Send size={24} className="text-[#00a884] cursor-pointer flex-shrink-0"
-                  onClick={handleSend} />
-              ) : (
-                <Mic size={24} className="text-[#8696a0] cursor-pointer hover:text-white flex-shrink-0" />
-              )}
+            {/* Input bar */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '6px 16px', background: C.header,
+              borderTop: `1px solid ${C.divider}`, flexShrink: 0, zIndex: 10, position: 'relative',
+            }}>
+              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textSec, padding: 4, display: 'flex' }}>
+                <Smile size={24} />
+              </button>
+              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.textSec, padding: 4, display: 'flex', transform: 'rotate(-45deg)' }}>
+                <Paperclip size={24} />
+              </button>
+              <div style={{ flex: 1, background: C.inputBg, borderRadius: 9, padding: '0 16px' }}>
+                <input
+                  value={newMsg}
+                  onChange={e => setNewMsg(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+                  placeholder="Type a message"
+                  disabled={sending}
+                  style={{
+                    background: 'none', border: 'none', outline: 'none',
+                    width: '100%', fontSize: 15, color: C.textPri,
+                    padding: '10px 0',
+                  }}
+                />
+              </div>
+              <button
+                onClick={handleSend}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: C.textSec, padding: 4, display: 'flex',
+                }}
+              >
+                {newMsg.trim()
+                  ? <Send size={24} color={C.green} />
+                  : <Mic size={24} />
+                }
+              </button>
             </div>
           </>
         ) : (
-          /* Empty state — bridge is ready but no chat selected */
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center p-12">
-            <Globe size={120} className="text-[#202c33]" />
-            <div>
-              <h2 className="text-3xl font-light text-[#e9edef] mb-2">WhatsApp Web</h2>
-              <p className="text-sm text-[#8696a0] max-w-sm">
-                Send and receive messages without keeping your phone online.
+          /* Empty state — bridge ready, no chat selected */
+          <div style={{
+            flex: 1, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            gap: 20, padding: 48, position: 'relative', zIndex: 1,
+          }}>
+            <div style={{
+              width: 200, height: 200, borderRadius: '50%',
+              background: 'rgba(134,150,160,.08)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Globe size={100} color="rgba(134,150,160,.15)" />
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <h2 style={{ color: C.textPri, fontSize: 32, fontWeight: 300, margin: '0 0 8px' }}>
+                WhatsApp Web
+              </h2>
+              <p style={{ color: C.textSec, fontSize: 14, maxWidth: 360, margin: 0, lineHeight: 1.6 }}>
+                Send and receive messages without keeping your phone online.<br />
+                Use WhatsApp on up to 4 linked devices and 1 phone at the same time.
               </p>
             </div>
-            <div className="flex items-center gap-2 text-xs text-[#8696a0] mt-6">
-              <ShieldCheck size={14} /><span>End-to-end encrypted</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: C.textSec, fontSize: 13 }}>
+              <ShieldCheck size={14} />
+              <span>Your personal messages are end-to-end encrypted</span>
             </div>
           </div>
         )}
       </div>
+
+      {/* Keyframe animation for spinner and pulse */}
+      <style>{`
+        @keyframes spin  { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(134,150,160,.3); border-radius: 3px; }
+      `}</style>
     </div>
   );
 };
