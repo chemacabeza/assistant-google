@@ -1,7 +1,12 @@
 package com.assistant.whatsapp;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -19,11 +24,58 @@ public class WhatsAppBridgeController {
 
     private final WhatsAppChatRepository chatRepository;
     private final WhatsAppMessageRepository messageRepository;
+    private final WebClient webClient;
+
+    @Value("${BRIDGE_URL:http://whatsapp-bridge:3001}")
+    private String bridgeUrl;
 
     public WhatsAppBridgeController(WhatsAppChatRepository chatRepository,
-                                    WhatsAppMessageRepository messageRepository) {
+                                    WhatsAppMessageRepository messageRepository,
+                                    WebClient.Builder webClientBuilder) {
         this.chatRepository = chatRepository;
         this.messageRepository = messageRepository;
+        this.webClient = webClientBuilder.build();
+    }
+
+    // ─── Bridge Proxy: Status ─────────────────────────────────────────────────
+
+    @GetMapping("/bridge/status")
+    public ResponseEntity<Map<String, Object>> getBridgeStatus() {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> status = webClient.get()
+                .uri(bridgeUrl + "/status")
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block(java.time.Duration.ofSeconds(3));
+            return ResponseEntity.ok(status != null ? status : Map.of("authenticated", false, "ready", false, "hasQr", false));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("authenticated", false, "ready", false, "hasQr", false, "error", e.getMessage()));
+        }
+    }
+
+    // ─── Bridge Proxy: QR Image ───────────────────────────────────────────────
+
+    @GetMapping("/bridge/qr")
+    public ResponseEntity<byte[]> getBridgeQr() {
+        try {
+            byte[] qrBytes = webClient.get()
+                .uri(bridgeUrl + "/qr")
+                .accept(MediaType.IMAGE_PNG)
+                .retrieve()
+                .bodyToMono(byte[].class)
+                .block(java.time.Duration.ofSeconds(5));
+            if (qrBytes == null || qrBytes.length == 0) {
+                return ResponseEntity.noContent().build();
+            }
+            return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .body(qrBytes);
+        } catch (WebClientResponseException e) {
+            return ResponseEntity.status(e.getStatusCode()).build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
     }
 
     // ─── Bridge Ingest: Chat Sync ─────────────────────────────────────────────
