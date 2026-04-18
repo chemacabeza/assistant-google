@@ -29,7 +29,12 @@ public class WhatsAppMessage {
     @Column(nullable = false)
     private String direction; // "INCOMING" or "OUTGOING"
 
-    private String messageSid; // WhatsApp Message ID from Meta
+    private String messageSid; // WhatsApp Message ID (Meta or native)
+
+    @Column(unique = true)
+    private String messageWaId; // Native whatsapp-web.js message ID (for dedup)
+
+    private String chatId; // Conversation ID from whatsapp-bridge
 
     @CreationTimestamp
     @Column(updatable = false)
@@ -45,6 +50,17 @@ public class WhatsAppMessage {
 
     private String recipientId;
 
+    private String mediaType; // IMAGE, VIDEO, AUDIO, DOCUMENT, STICKER, etc.
+
+    @Column(columnDefinition = "TEXT")
+    private String mediaBase64; // Base64-encoded media data for inline display
+
+    private String mediaMimetype; // e.g. "image/jpeg"
+
+    private String authorName; // For group messages: sender's display name
+
+    private String authorPhone; // For group messages: sender's phone number
+
     public WhatsAppMessage() {}
 
     public WhatsAppMessage(User user, String senderId, String senderName, String content, String direction, String messageSid) {
@@ -54,6 +70,27 @@ public class WhatsAppMessage {
         this.content = content;
         this.direction = direction;
         this.messageSid = messageSid;
+    }
+
+    // Bridge constructor
+    public WhatsAppMessage(String chatId, String messageWaId, String senderId, String senderName,
+                           String content, String direction, String mediaType,
+                           String mediaBase64, String mediaMimetype,
+                           String authorName, String authorPhone,
+                           String repliedToContent, LocalDateTime timestamp) {
+        this.chatId = chatId;
+        this.messageWaId = messageWaId;
+        this.senderId = senderId;
+        this.senderName = senderName;
+        this.content = content;
+        this.direction = direction;
+        this.mediaType = mediaType;
+        this.mediaBase64 = mediaBase64;
+        this.mediaMimetype = mediaMimetype;
+        this.authorName = authorName;
+        this.authorPhone = authorPhone;
+        this.repliedToContent = repliedToContent;
+        this.timestamp = timestamp;
     }
 
     // Getters and Setters
@@ -79,7 +116,20 @@ public class WhatsAppMessage {
     public void setMediaMetadata(String mediaMetadata) { this.mediaMetadata = mediaMetadata; }
     public String getRecipientId() { return recipientId; }
     public void setRecipientId(String recipientId) { this.recipientId = recipientId; }
-
     public LocalDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+    public String getMessageWaId() { return messageWaId; }
+    public void setMessageWaId(String messageWaId) { this.messageWaId = messageWaId; }
+    public String getChatId() { return chatId; }
+    public void setChatId(String chatId) { this.chatId = chatId; }
+    public String getMediaType() { return mediaType; }
+    public void setMediaType(String mediaType) { this.mediaType = mediaType; }
+    public String getMediaBase64() { return mediaBase64; }
+    public void setMediaBase64(String mediaBase64) { this.mediaBase64 = mediaBase64; }
+    public String getMediaMimetype() { return mediaMimetype; }
+    public void setMediaMimetype(String mediaMimetype) { this.mediaMimetype = mediaMimetype; }
+    public String getAuthorName() { return authorName; }
+    public void setAuthorName(String authorName) { this.authorName = authorName; }
+    public String getAuthorPhone() { return authorPhone; }
+    public void setAuthorPhone(String authorPhone) { this.authorPhone = authorPhone; }
 }

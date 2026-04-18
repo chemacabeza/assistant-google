@@ -27,6 +27,14 @@ RUN echo 'server { \
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
         proxy_set_header X-Forwarded-Proto $scheme; \
     } \
+    location /api/whatsapp/bridge/qr { \
+        proxy_pass http://whatsapp-bridge:3001/qr; \
+        proxy_read_timeout 30s; \
+    } \
+    location /api/whatsapp/bridge/status { \
+        proxy_pass http://whatsapp-bridge:3001/status; \
+        proxy_read_timeout 10s; \
+    } \
 }' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

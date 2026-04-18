@@ -27,6 +27,9 @@ replay_pid*
 .vscode/
 *.jar.original
 *.tgz
+# Allow important JSON config files
+!**/package.json
+!**/tsconfig*.json
 
 # Maven build output
 backend/target/

@@ -55,5 +55,21 @@ services:
       - backend
     restart: unless-stopped
 
+  whatsapp-bridge:
+    build:
+      context: ./whatsapp-bridge
+      dockerfile: Dockerfile
+    container_name: assistant-whatsapp-bridge
+    environment:
+      - BACKEND_URL=http://backend:8080
+      - SESSION_DIR=/app/sessions
+      - PORT=3001
+    volumes:
+      - whatsapp_sessions:/app/sessions
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  whatsapp_sessions:
