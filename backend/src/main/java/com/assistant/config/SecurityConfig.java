@@ -51,6 +51,7 @@ public class SecurityConfig {
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                 .csrfTokenRequestHandler(requestHandler)
                 .ignoringRequestMatchers("/api/whatsapp/webhook")
+                .ignoringRequestMatchers("/api/whatsapp/bridge/**")
             )
             .addFilterAfter(new OncePerRequestFilter() {
                 @Override
@@ -64,9 +65,10 @@ public class SecurityConfig {
                 }
             }, BasicAuthenticationFilter.class)
             .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/api/auth/profile").permitAll() // allows checking if logged in without redirect
-                .requestMatchers("/api/auth/google/start").permitAll() // allows frontend login redirection
+                .requestMatchers("/api/auth/profile").permitAll()
+                .requestMatchers("/api/auth/google/start").permitAll()
                 .requestMatchers("/api/whatsapp/webhook").permitAll()
+                .requestMatchers("/api/whatsapp/bridge/**").permitAll()
                 .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated()
             )

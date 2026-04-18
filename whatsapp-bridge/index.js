@@ -4,6 +4,8 @@ const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const express = require('express');
 const qrcode = require('qrcode');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 app.use(express.json());
@@ -11,6 +13,27 @@ app.use(express.json());
 const PORT = process.env.PORT || 3001;
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
 const SESSION_DIR = process.env.SESSION_DIR || './sessions';
+
+// ─── Stale Lock Cleanup ──────────────────────────────────────────────────────
+// Chromium leaves a SingletonLock file when the container is killed. Remove it.
+function cleanStaleLocks(dir) {
+  try {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        cleanStaleLocks(full);
+      } else if (entry.name === 'SingletonLock' || entry.name === 'SingletonSocket' || entry.name === 'SingletonCookie') {
+        fs.unlinkSync(full);
+        console.log(`[Bridge] Removed stale lock: ${full}`);
+      }
+    }
+  } catch (e) {
+    console.warn('[Bridge] Lock cleanup warning:', e.message);
+  }
+}
+cleanStaleLocks(SESSION_DIR);
 
 // ─── State ──────────────────────────────────────────────────────────────────
 let currentQrDataUrl = null;
