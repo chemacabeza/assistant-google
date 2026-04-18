@@ -43,6 +43,13 @@ let isReady = false;
 // ─── WhatsApp Client ─────────────────────────────────────────────────────────
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: SESSION_DIR }),
+  // Pin a known-stable WhatsApp Web version to avoid "Couldn't link device"
+  // errors caused by breaking changes in the live WhatsApp Web releases.
+  webVersion: '2.3000.1014111620',
+  webVersionCache: {
+    type: 'remote',
+    remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1014111620.html',
+  },
   puppeteer: {
     headless: true,
     args: [
@@ -52,11 +59,18 @@ const client = new Client({
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
-      '--disable-gpu'
+      '--disable-gpu',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-features=TranslateUI',
+      '--disable-ipc-flooding-protection',
+      '--window-size=1920,1080',
     ],
     executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium'
   }
 });
+
 
 // ─── QR Code Event ───────────────────────────────────────────────────────────
 client.on('qr', async (qr) => {
