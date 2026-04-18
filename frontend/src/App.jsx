@@ -27,6 +27,15 @@ function App() {
           <Route path="/login" element={<Login />} />
           
           {/* Protected Routes Wrapper */}
+          {/* WhatsApp: full-screen, no sidebar/topbar — mirrors web.whatsapp.com */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/whatsapp" element={
+              <div style={{ width:'100vw', height:'100vh', overflow:'hidden' }}>
+                <WhatsApp />
+              </div>
+            } />
+          </Route>
+
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -38,7 +47,6 @@ function App() {
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/templates" element={<Templates />} />
               <Route path="/maps" element={<Maps />} />
-              <Route path="/whatsapp" element={<WhatsApp />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/configuration" element={<Configuration />} />
               

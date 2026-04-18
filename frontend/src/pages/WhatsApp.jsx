@@ -1,11 +1,12 @@
 import React, {
   useState, useEffect, useMemo, useRef, useCallback,
 } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search, MoreVertical, Send, Paperclip, Smile, Mic,
   CheckCheck, ShieldCheck, Globe, Loader2, X, RefreshCw,
   Image as ImageIcon, FileText, Volume2, Video, Phone, Edit3,
-  MessageSquare, Users, CircleDot, Star, Filter,
+  MessageSquare, Users, CircleDot, Star, ArrowLeft, Camera,
 } from 'lucide-react';
 import { api } from '../api/axios';
 
@@ -24,10 +25,10 @@ const C = {
   textSec:   '#8696a0',
   green:     '#00a884',
   blue:      '#53bdeb',
-  iconBg:    '#182229',
+  iconActive:'#e9edef',
 };
 
-/* ─── Avatar fallback colors (same set WA uses) ─────────────────────────── */
+/* ─── Avatar fallback colors ─────────────────────────────────────────────── */
 const BG = ['#00a884','#128c7e','#dfa62f','#3b82f6','#9333ea','#ef4444','#f97316','#0ea5e9'];
 const avatarBg = (id = '') => BG[id.split('').reduce((a,c)=>a+c.charCodeAt(0),0) % BG.length];
 
@@ -61,7 +62,7 @@ const mediaIcon = type => {
   return <FileText size={14}/>;
 };
 
-/* ─── Avatar Component ────────────────────────────────────────────────────── */
+/* ─── Avatar ──────────────────────────────────────────────────────────────── */
 const Avatar = ({ src, name='?', id='', size=40 }) => {
   const [err, setErr] = useState(false);
   if (src && !err) return (
@@ -74,49 +75,27 @@ const Avatar = ({ src, name='?', id='', size=40 }) => {
       width:size, height:size, borderRadius:'50%', flexShrink:0,
       background: avatarBg(id||name), display:'flex',
       alignItems:'center', justifyContent:'center',
-      fontWeight:700, fontSize:size*0.43, color:'#fff',
+      fontWeight:700, fontSize:size*0.43, color:'#fff', userSelect:'none',
     }}>
       {(name||'?')[0].toUpperCase()}
     </div>
   );
 };
 
-/* ─── Left Icon Strip (matches WA Web layout) ────────────────────────────── */
-const LeftStrip = ({ bridgeStatus }) => (
-  <div style={{
-    width:60, background:C.iconBg, display:'flex',
-    flexDirection:'column', alignItems:'center',
-    paddingTop:12, gap:4, borderRight:`1px solid ${C.divider}`,
-    flexShrink:0,
-  }}>
-    <div style={{ marginBottom:'auto', display:'flex', flexDirection:'column', alignItems:'center', gap:8, paddingTop:4 }}>
-      <div style={{
-        width:40, height:40, borderRadius:'50%',
-        background:'#3c4a50', display:'flex', alignItems:'center', justifyContent:'center',
-      }}>
-        <span style={{ color:'#e9edef', fontSize:15, fontWeight:700 }}>W</span>
-      </div>
-    </div>
-    <div style={{ marginTop:'auto', display:'flex', flexDirection:'column', alignItems:'center', gap:4, paddingBottom:12 }}>
-      <button style={{ background:'none', border:'none', cursor:'pointer', padding:8, color:C.textSec, display:'flex', borderRadius:'50%' }} title="Status">
-        <CircleDot size={22}/>
-      </button>
-      <button style={{ background:'none', border:'none', cursor:'pointer', padding:8, color:C.textSec, display:'flex', borderRadius:'50%' }} title="Communities">
-        <Users size={22}/>
-      </button>
-      <button style={{ background:'none', border:'none', cursor:'pointer', padding:8, color:C.textSec, display:'flex', borderRadius:'50%' }} title="Chats">
-        <MessageSquare size={22}/>
-      </button>
-      {/* Bridge status dot */}
-      <div style={{
-        width:8, height:8, borderRadius:'50%', margin:'4px auto',
-        background: bridgeStatus === 'ready' ? C.green : bridgeStatus === 'offline' ? '#ef4444' : '#facc15',
-      }} title={`Bridge: ${bridgeStatus}`}/>
-    </div>
-  </div>
+/* ─── Small icon button ───────────────────────────────────────────────────── */
+const IconBtn = ({ icon, title, onClick }) => (
+  <button onClick={onClick} title={title} style={{
+    background:'none', border:'none', cursor:'pointer',
+    color: C.textSec, padding:8, borderRadius:'50%', display:'flex',
+    alignItems:'center', justifyContent:'center',
+    transition:'color .15s',
+  }}
+    onMouseEnter={e=>e.currentTarget.style.color=C.iconActive}
+    onMouseLeave={e=>e.currentTarget.style.color=C.textSec}
+  >{icon}</button>
 );
 
-/* ─── QR / Bridge Overlay ─────────────────────────────────────────────────── */
+/* ─── QR / Bridge Overlay ────────────────────────────────────────────────── */
 const BridgeOverlay = ({ status, qrUrl, onRetry, onRefreshQr }) => (
   <div style={{
     flex:1, display:'flex', flexDirection:'column',
@@ -124,10 +103,8 @@ const BridgeOverlay = ({ status, qrUrl, onRetry, onRefreshQr }) => (
     background:C.bg, gap:24, position:'relative', zIndex:1,
   }}>
     <div style={{ textAlign:'center' }}>
-      <h2 style={{ color:C.textPri, fontSize:22, fontWeight:300, margin:'0 0 8px' }}>
-        Link your WhatsApp
-      </h2>
-      <p style={{ color:C.textSec, fontSize:13, margin:0, maxWidth:320, lineHeight:1.6 }}>
+      <h2 style={{ color:C.textPri, fontSize:22, fontWeight:300, margin:'0 0 8px' }}>Link your WhatsApp</h2>
+      <p style={{ color:C.textSec, fontSize:13, margin:0, maxWidth:320, lineHeight:1.7 }}>
         Scan this QR code with WhatsApp on your phone to mirror all your conversations.
       </p>
     </div>
@@ -140,7 +117,7 @@ const BridgeOverlay = ({ status, qrUrl, onRetry, onRefreshQr }) => (
     )}
 
     {status === 'qr' && (
-      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:18 }}>
         <div style={{ background:'#fff', padding:20, borderRadius:16, boxShadow:'0 8px 32px rgba(0,0,0,.5)' }}>
           {qrUrl
             ? <img src={qrUrl} alt="QR" style={{ width:264, height:264, display:'block' }}/>
@@ -166,10 +143,7 @@ const BridgeOverlay = ({ status, qrUrl, onRetry, onRefreshQr }) => (
 
     {status === 'offline' && (
       <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12 }}>
-        <div style={{
-          width:64, height:64, borderRadius:'50%',
-          background:'rgba(239,68,68,.1)', display:'flex', alignItems:'center', justifyContent:'center',
-        }}>
+        <div style={{ width:64, height:64, borderRadius:'50%', background:'rgba(239,68,68,.1)', display:'flex', alignItems:'center', justifyContent:'center' }}>
           <X size={28} color="#ef4444"/>
         </div>
         <p style={{ color:C.textSec, fontSize:13, textAlign:'center', margin:0 }}>
@@ -202,18 +176,13 @@ const Bubble = ({ msg }) => {
       <div style={{
         maxWidth:'65%', background: out ? C.bubbleOut : C.bubbleIn,
         borderRadius: out ? '8px 0 8px 8px' : '0 8px 8px 8px',
-        padding:'6px 9px 8px',
-        boxShadow:'0 1px 2px rgba(0,0,0,.3)',
-        position:'relative',
+        padding:'6px 9px 8px', boxShadow:'0 1px 2px rgba(0,0,0,.3)', position:'relative',
       }}>
-        {/* Group author name */}
+        {/* Group author */}
         {!out && msg.authorName && (
-          <p style={{ fontSize:12.5, fontWeight:700, color:C.green, margin:'0 0 2px' }}>
-            {msg.authorName}
-          </p>
+          <p style={{ fontSize:12.5, fontWeight:700, color:C.green, margin:'0 0 2px' }}>{msg.authorName}</p>
         )}
-
-        {/* Quoted reply */}
+        {/* Quoted */}
         {msg.repliedToContent && (
           <div style={{ marginBottom:6, borderRadius:6, overflow:'hidden', borderLeft:`4px solid ${C.green}`, background:'rgba(0,0,0,.22)' }}>
             <div style={{ padding:'4px 8px' }}>
@@ -222,7 +191,6 @@ const Bubble = ({ msg }) => {
             </div>
           </div>
         )}
-
         {hasImg && mediaSrc && (
           <div style={{ margin:'-6px -9px 6px', overflow:'hidden', borderRadius: out ? '8px 0 0 0' : '0 8px 0 0' }}>
             <img src={mediaSrc} alt="media" style={{ maxHeight:320, width:'100%', objectFit:'cover', display:'block' }}/>
@@ -238,24 +206,19 @@ const Bubble = ({ msg }) => {
             <audio src={mediaSrc} controls style={{ height:36, width:'100%' }}/>
           </div>
         )}
-
         {msg.content && (
-          <p style={{ fontSize:14.2, color:C.textPri, margin:0, whiteSpace:'pre-wrap', wordBreak:'break-word', paddingRight:56, lineHeight:1.45 }}>
+          <p style={{ fontSize:14.2, color:C.textPri, margin:0, whiteSpace:'pre-wrap', wordBreak:'break-word', paddingRight:52, lineHeight:1.45 }}>
             {msg.content}
           </p>
         )}
-
         {!msg.content && !hasImg && !hasVideo && !hasAudio && msg.mediaType && (
           <div style={{ display:'flex', alignItems:'center', gap:6, color:C.textSec, fontSize:13, paddingRight:52 }}>
             {mediaIcon(msg.mediaType)} <span style={{ textTransform:'capitalize' }}>{msg.mediaType.toLowerCase()}</span>
           </div>
         )}
-
-        {/* Timestamp + tick */}
+        {/* Time + tick */}
         <div style={{ position:'absolute', bottom:5, right:8, display:'flex', alignItems:'center', gap:3 }}>
-          <span style={{ fontSize:11, color:'rgba(134,150,160,.9)', whiteSpace:'nowrap' }}>
-            {fmtTime(msg.timestamp)}
-          </span>
+          <span style={{ fontSize:11, color:'rgba(134,150,160,.9)', whiteSpace:'nowrap' }}>{fmtTime(msg.timestamp)}</span>
           {out && <CheckCheck size={15} color={C.blue}/>}
         </div>
       </div>
@@ -272,8 +235,47 @@ const DateDivider = ({ label }) => (
   </div>
 );
 
-/* ─── Main WhatsApp Component ─────────────────────────────────────────────── */
+/* ─── Chat Row ────────────────────────────────────────────────────────────── */
+const ChatRow = ({ chat, isSelected, onClick }) => (
+  <div onClick={onClick} style={{
+    display:'flex', alignItems:'center', gap:13,
+    padding:'10px 16px', cursor:'pointer',
+    borderBottom:`1px solid ${C.divider}`,
+    background: isSelected ? C.selected : 'transparent',
+    transition:'background .1s',
+  }}
+    onMouseEnter={e=>{ if(!isSelected) e.currentTarget.style.background = C.hover; }}
+    onMouseLeave={e=>{ if(!isSelected) e.currentTarget.style.background = 'transparent'; }}
+  >
+    <Avatar src={chat.avatarUrl} name={chat.name} id={chat.chatId} size={49}/>
+    <div style={{ flex:1, minWidth:0 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:3 }}>
+        <span style={{ color:C.textPri, fontSize:16, fontWeight:400, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'calc(100% - 60px)' }}>
+          {chat.name}
+        </span>
+        <span style={{ color: chat.unreadCount>0 ? C.green : C.textSec, fontSize:12, flexShrink:0 }}>
+          {fmtTime(chat.lastMessageTimestamp)}
+        </span>
+      </div>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <span style={{ color:C.textSec, fontSize:13.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'calc(100% - 30px)' }}>
+          {chat.lastMessage || ''}
+        </span>
+        {chat.unreadCount > 0 && (
+          <span style={{ background:C.green, color:'#111b21', fontSize:11, fontWeight:700, borderRadius:'50%', minWidth:20, height:20, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', flexShrink:0 }}>
+            {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+          </span>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════════════════════════════════════════ */
 const WhatsApp = () => {
+  const navigate = useNavigate();
   const [chats, setChats]               = useState([]);
   const [messages, setMessages]         = useState([]);
   const [selected, setSelected]         = useState(null);
@@ -285,12 +287,11 @@ const WhatsApp = () => {
   const [filter, setFilter]             = useState('All');
   const [qrUrl, setQrUrl]               = useState(null);
 
-  const endRef    = useRef(null);
-  const pollRef   = useRef(null);
-  const msgPollRef= useRef(null);
-  const qrBlobRef = useRef(null);
+  const endRef     = useRef(null);
+  const pollRef    = useRef(null);
+  const msgPollRef = useRef(null);
+  const qrBlobRef  = useRef(null);
 
-  /* bridge status */
   const checkBridge = useCallback(async () => {
     try {
       const r = await api.get('/api/whatsapp/bridge/status', { timeout:5000 });
@@ -302,29 +303,24 @@ const WhatsApp = () => {
     } catch { setBridgeStatus('offline'); }
   }, []);
 
-  /* fetch QR blob */
   const fetchQr = useCallback(async () => {
     try {
       const r = await api.get('/api/whatsapp/bridge/qr', { responseType:'blob', timeout:8000 });
       if (r.status === 200 && r.data.size > 0) {
         if (qrBlobRef.current) URL.revokeObjectURL(qrBlobRef.current);
         const url = URL.createObjectURL(r.data);
-        qrBlobRef.current = url;
-        setQrUrl(url);
+        qrBlobRef.current = url; setQrUrl(url);
       }
     } catch { /* not ready */ }
   }, []);
 
-  /* fetch chats */
   const fetchChats = useCallback(async () => {
     try {
       const r = await api.get('/api/whatsapp/chats');
-      setChats(r.data || []);
-      setLoading(false);
+      setChats(r.data || []); setLoading(false);
     } catch { setLoading(false); }
   }, []);
 
-  /* fetch messages for selected chat */
   const fetchMessages = useCallback(async (chatId) => {
     if (!chatId) return;
     try {
@@ -333,14 +329,14 @@ const WhatsApp = () => {
     } catch { setMessages([]); }
   }, []);
 
-  /* initial poll: bridge + chats every 5s */
+  // Initial poll
   useEffect(() => {
     checkBridge(); fetchChats();
     pollRef.current = setInterval(() => { checkBridge(); fetchChats(); }, 5000);
     return () => clearInterval(pollRef.current);
   }, [checkBridge, fetchChats]);
 
-  /* QR auto-refresh every 25s */
+  // QR refresh
   useEffect(() => {
     if (bridgeStatus !== 'qr') return;
     fetchQr();
@@ -351,7 +347,7 @@ const WhatsApp = () => {
     };
   }, [bridgeStatus, fetchQr]);
 
-  /* poll messages every 5s when chat is open */
+  // Message polling for selected chat
   useEffect(() => {
     clearInterval(msgPollRef.current);
     if (!selected) { setMessages([]); return; }
@@ -360,19 +356,16 @@ const WhatsApp = () => {
     return () => clearInterval(msgPollRef.current);
   }, [selected, fetchMessages]);
 
-  /* auto-scroll */
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:'smooth' }); }, [messages]);
 
-  /* filtered + searched chats */
   const visibleChats = useMemo(() => chats.filter(c => {
     const m = (c.name||'').toLowerCase().includes(search.toLowerCase());
-    if (filter === 'Unread')    return m && c.unreadCount > 0;
-    if (filter === 'Favorites') return m && c.favorite;
-    if (filter === 'Groups')    return m && c.group;
+    if (filter==='Unread')    return m && c.unreadCount > 0;
+    if (filter==='Favorites') return m && c.favorite;
+    if (filter==='Groups')    return m && c.group;
     return m;
   }), [chats, search, filter]);
 
-  /* group messages by date for dividers */
   const msgItems = useMemo(() => {
     const out = []; let lastDate = '';
     messages.forEach(msg => {
@@ -386,7 +379,6 @@ const WhatsApp = () => {
     return out;
   }, [messages]);
 
-  /* send */
   const handleSend = async () => {
     if (!newMsg.trim() || !selected || sending) return;
     try {
@@ -400,32 +392,64 @@ const WhatsApp = () => {
 
   const showOverlay = bridgeStatus !== 'ready';
 
-  /* ── RENDER ────────────────────────────────────────────────────────────── */
+  /* ── RENDER ─────────────────────────────────────────────────────────────── */
   return (
     <div style={{
-      display:'flex', height:'100%', overflow:'hidden',
-      borderRadius:12, boxShadow:'0 4px 32px rgba(0,0,0,.6)',
+      display:'flex', width:'100vw', height:'100vh', overflow:'hidden',
       background:C.bg,
       fontFamily:"'Segoe UI', Helvetica, Arial, sans-serif",
     }}>
 
-      {/* ── LEFT ICON STRIP ───────────────────────────────────────────────── */}
-      <LeftStrip bridgeStatus={bridgeStatus}/>
-
-      {/* ── CHAT LIST ─────────────────────────────────────────────────────── */}
+      {/* ── THIN LEFT STRIP (WhatsApp Web style) ──────────────────────────── */}
       <div style={{
-        width:360, minWidth:360, display:'flex', flexDirection:'column',
-        borderRight:`1px solid ${C.divider}`, background:C.panel,
+        width:60, background:'#182229', display:'flex', flexDirection:'column',
+        alignItems:'center', padding:'0', flexShrink:0,
+        borderRight:`1px solid ${C.divider}`,
       }}>
+        {/* Top: Go back to app dashboard */}
+        <button onClick={()=>navigate('/dashboard')} title="Back to Dashboard" style={{
+          background:'none', border:'none', cursor:'pointer',
+          color:C.textSec, padding:'16px 0 8px', display:'flex', flexDirection:'column',
+          alignItems:'center', gap:2, width:'100%',
+        }}
+          onMouseEnter={e=>e.currentTarget.style.color=C.textPri}
+          onMouseLeave={e=>e.currentTarget.style.color=C.textSec}
+        >
+          <ArrowLeft size={20}/>
+        </button>
 
+        {/* Spacer */}
+        <div style={{ flex:1 }}/>
+
+        {/* Bottom icons (WA Web style) */}
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, paddingBottom:16 }}>
+          <IconBtn icon={<CircleDot size={22}/>} title="Status"/>
+          <IconBtn icon={<Users size={22}/>} title="Communities"/>
+          <IconBtn icon={<MessageSquare size={22}/>} title="Chats"/>
+          {/* Bridge status indicator */}
+          <div style={{
+            width:8, height:8, borderRadius:'50%', margin:'6px auto 0',
+            background: bridgeStatus==='ready' ? C.green : bridgeStatus==='offline' ? '#ef4444' : '#facc15',
+            boxShadow: bridgeStatus==='ready' ? `0 0 6px ${C.green}` : 'none',
+          }} title={`Bridge: ${bridgeStatus}`}/>
+        </div>
+      </div>
+
+      {/* ── CHAT LIST PANEL ───────────────────────────────────────────────── */}
+      <div style={{
+        width:370, minWidth:370, display:'flex', flexDirection:'column',
+        background:C.panel, borderRight:`1px solid ${C.divider}`,
+      }}>
         {/* Header */}
-        <div style={{
-          height:60, background:C.header, flexShrink:0,
-          display:'flex', alignItems:'center', justifyContent:'space-between',
-          padding:'0 16px',
-        }}>
-          <span style={{ color:C.textPri, fontWeight:700, fontSize:18 }}>WhatsApp</span>
-          <div style={{ display:'flex', alignItems:'center', gap:2, color:C.textSec }}>
+        <div style={{ height:60, background:C.header, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            {/* User's own avatar placeholder */}
+            <div style={{ width:40, height:40, borderRadius:'50%', background:'#3c4a50', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <Camera size={18} color={C.textSec}/>
+            </div>
+          </div>
+          <span style={{ color:C.textPri, fontWeight:700, fontSize:19, flex:1, paddingLeft:12 }}>WhatsApp</span>
+          <div style={{ display:'flex', alignItems:'center', gap:2 }}>
             <IconBtn icon={<Edit3 size={20}/>} title="New chat"/>
             <IconBtn icon={<MoreVertical size={20}/>} title="Menu"/>
           </div>
@@ -447,7 +471,7 @@ const WhatsApp = () => {
         <div style={{ display:'flex', gap:6, padding:'4px 12px 8px', overflowX:'auto', flexShrink:0 }}>
           {['All','Unread','Favorites','Groups'].map(f=>(
             <button key={f} onClick={()=>setFilter(f)} style={{
-              border:'none', borderRadius:16, padding:'4px 12px',
+              border:'none', borderRadius:16, padding:'5px 14px',
               fontSize:13, fontWeight:500, cursor:'pointer', whiteSpace:'nowrap',
               background: filter===f ? C.green : C.inputBg,
               color: filter===f ? '#111b21' : C.textSec,
@@ -455,27 +479,28 @@ const WhatsApp = () => {
           ))}
         </div>
 
-        {/* Special rows */}
+        {/* Locked / Archived */}
         <SpecialRow icon={<ShieldCheck size={20} color={C.green}/>} label="Locked chats"/>
         <SpecialRow icon={<Globe size={18} color={C.textSec}/>} label="Archived" border/>
 
-        {/* Chat list */}
+        {/* Chat items */}
         <div style={{ flex:1, overflowY:'auto' }}>
-          {loading && <div style={{ display:'flex', justifyContent:'center', padding:32 }}>
-            <Loader2 size={24} color={C.green} style={{ animation:'spin 1s linear infinite' }}/>
-          </div>}
+          {loading && (
+            <div style={{ display:'flex', justifyContent:'center', padding:32 }}>
+              <Loader2 size={24} color={C.green} style={{ animation:'spin 1s linear infinite' }}/>
+            </div>
+          )}
           {!loading && visibleChats.length===0 && bridgeStatus==='ready' && (
             <p style={{ textAlign:'center', color:C.textSec, fontSize:14, padding:32 }}>No conversations found</p>
           )}
           {visibleChats.map(chat=>(
-            <ChatRow key={chat.chatId} chat={chat} selected={selected?.chatId===chat.chatId} onClick={()=>setSelected(chat)}/>
+            <ChatRow key={chat.chatId} chat={chat} isSelected={selected?.chatId===chat.chatId} onClick={()=>setSelected(chat)}/>
           ))}
         </div>
       </div>
 
       {/* ── RIGHT PANEL ───────────────────────────────────────────────────── */}
       <div style={{ flex:1, display:'flex', flexDirection:'column', background:C.bg, position:'relative', overflow:'hidden' }}>
-
         {/* Wallpaper */}
         <div style={{
           position:'absolute', inset:0, opacity:.065, pointerEvents:'none',
@@ -489,17 +514,15 @@ const WhatsApp = () => {
           <>
             {/* Chat header */}
             <div style={{
-              height:60, background:C.header, flexShrink:0,
+              height:60, background:C.header, flexShrink:0, position:'relative', zIndex:10,
               display:'flex', alignItems:'center', justifyContent:'space-between',
-              padding:'0 16px', borderBottom:`1px solid ${C.divider}`, position:'relative', zIndex:10,
+              padding:'0 16px', borderBottom:`1px solid ${C.divider}`,
             }}>
               <div style={{ display:'flex', alignItems:'center', gap:12, cursor:'pointer' }}>
                 <Avatar src={selected.avatarUrl} name={selected.name} id={selected.chatId} size={40}/>
                 <div>
-                  <p style={{ color:C.textPri, fontSize:15.5, fontWeight:500, margin:0 }}>{selected.name}</p>
-                  <p style={{ color:C.textSec, fontSize:12, margin:0 }}>
-                    {selected.group ? 'Group' : 'click here for contact info'}
-                  </p>
+                  <p style={{ color:C.textPri, fontSize:16, fontWeight:500, margin:0 }}>{selected.name}</p>
+                  <p style={{ color:C.textSec, fontSize:12, margin:0 }}>{selected.group ? 'Group' : 'click here for contact info'}</p>
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center' }}>
@@ -511,18 +534,18 @@ const WhatsApp = () => {
 
             {/* Messages */}
             <div style={{ flex:1, overflowY:'auto', padding:'8px 0', position:'relative', zIndex:1 }}>
-              {messages.length===0 && (
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%' }}>
-                  <div style={{ background:C.header, color:C.textSec, borderRadius:8, padding:'6px 16px', fontSize:13, boxShadow:'0 1px 2px rgba(0,0,0,.3)' }}>
-                    No messages yet
+              {messages.length===0
+                ? <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%' }}>
+                    <div style={{ background:C.header, color:C.textSec, borderRadius:8, padding:'6px 16px', fontSize:13 }}>
+                      No messages yet
+                    </div>
                   </div>
-                </div>
-              )}
-              {msgItems.map((item,i) =>
-                item.kind==='divider'
-                  ? <DateDivider key={item.key} label={item.label}/>
-                  : <Bubble key={item.msg.id||i} msg={item.msg}/>
-              )}
+                : msgItems.map((item,i) =>
+                    item.kind==='divider'
+                      ? <DateDivider key={item.key} label={item.label}/>
+                      : <Bubble key={item.msg.id||i} msg={item.msg}/>
+                  )
+              }
               <div ref={endRef}/>
             </div>
 
@@ -549,28 +572,28 @@ const WhatsApp = () => {
             </div>
           </>
         ) : (
-          // Empty state
-          <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:24, padding:48, position:'relative', zIndex:1 }}>
-            <div style={{ width:200, height:200, borderRadius:'50%', background:'rgba(134,150,160,.07)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <Globe size={110} color="rgba(134,150,160,.13)"/>
+          /* No chat selected — empty state */
+          <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:24, padding:48, position:'relative', zIndex:1, textAlign:'center' }}>
+            <div style={{ width:220, height:220, borderRadius:'50%', background:'rgba(134,150,160,.07)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <Globe size={120} color="rgba(134,150,160,.12)"/>
             </div>
-            <div style={{ textAlign:'center' }}>
-              <h2 style={{ color:C.textPri, fontSize:33, fontWeight:300, margin:'0 0 12px' }}>WhatsApp Web</h2>
-              <p style={{ color:C.textSec, fontSize:14, maxWidth:380, margin:0, lineHeight:1.65 }}>
+            <div>
+              <h2 style={{ color:C.textPri, fontSize:34, fontWeight:300, margin:'0 0 12px' }}>WhatsApp Web</h2>
+              <p style={{ color:C.textSec, fontSize:14, maxWidth:400, margin:'0 auto', lineHeight:1.7 }}>
                 Send and receive messages without keeping your phone online.<br/>
                 Use WhatsApp on up to 4 linked devices and 1 phone at the same time.
               </p>
             </div>
-            <div style={{ width:'60%', height:1, background:C.divider }}/>
-            <div style={{ display:'flex', alignItems:'center', gap:6, color:C.textSec, fontSize:13 }}>
-              <ShieldCheck size={14}/>
+            <div style={{ width:'55%', height:1, background:C.divider }}/>
+            <div style={{ display:'flex', alignItems:'center', gap:8, color:C.textSec, fontSize:13 }}>
+              <ShieldCheck size={15}/>
               <span>Your personal messages are end-to-end encrypted</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* CSS animations */}
+      {/* CSS */}
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         ::-webkit-scrollbar { width:5px; }
@@ -582,68 +605,17 @@ const WhatsApp = () => {
   );
 };
 
-/* ─── Small reusable sub-components ──────────────────────────────────────── */
-const IconBtn = ({ icon, title, onClick }) => (
-  <button onClick={onClick} title={title} style={{
-    background:'none', border:'none', cursor:'pointer',
-    color:'#8696a0', padding:8, borderRadius:'50%', display:'flex',
-    transition:'color .15s',
-  }}
-    onMouseEnter={e=>e.currentTarget.style.color='#e9edef'}
-    onMouseLeave={e=>e.currentTarget.style.color='#8696a0'}
-  >
-    {icon}
-  </button>
-);
-
+/* ─── Sub-components ──────────────────────────────────────────────────────── */
 const SpecialRow = ({ icon, label, border }) => (
   <div style={{
-    display:'flex', alignItems:'center', gap:16,
-    padding:'12px 20px', cursor:'pointer',
-    borderBottom: border ? `1px solid #222d34` : 'none',
+    display:'flex', alignItems:'center', gap:16, padding:'12px 20px', cursor:'pointer',
+    borderBottom: border ? `1px solid ${C.divider}` : 'none', flexShrink:0,
   }}
-    onMouseEnter={e=>e.currentTarget.style.background='#2a3942'}
+    onMouseEnter={e=>e.currentTarget.style.background=C.hover}
     onMouseLeave={e=>e.currentTarget.style.background='transparent'}
   >
     {icon}
-    <span style={{ color:'#e9edef', fontSize:15 }}>{label}</span>
-  </div>
-);
-
-const ChatRow = ({ chat, selected, onClick }) => (
-  <div
-    onClick={onClick}
-    style={{
-      display:'flex', alignItems:'center', gap:12,
-      padding:'10px 20px', cursor:'pointer',
-      borderBottom:'1px solid #222d34',
-      background: selected ? '#2a3942' : 'transparent',
-      transition:'background .1s',
-    }}
-    onMouseEnter={e=>{ if(!selected) e.currentTarget.style.background='#2a3942'; }}
-    onMouseLeave={e=>{ if(!selected) e.currentTarget.style.background='transparent'; }}
-  >
-    <Avatar src={chat.avatarUrl} name={chat.name} id={chat.chatId} size={50}/>
-    <div style={{ flex:1, minWidth:0 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:3 }}>
-        <span style={{ color:'#e9edef', fontSize:16, fontWeight:400, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:210 }}>
-          {chat.name}
-        </span>
-        <span style={{ color: chat.unreadCount>0 ? '#00a884' : '#8696a0', fontSize:12, flexShrink:0, marginLeft:8 }}>
-          {fmtTime(chat.lastMessageTimestamp)}
-        </span>
-      </div>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <span style={{ color:'#8696a0', fontSize:13.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:240, display:'flex', alignItems:'center', gap:4 }}>
-          {chat.lastMessage || ''}
-        </span>
-        {chat.unreadCount>0 && (
-          <span style={{ background:'#00a884', color:'#111b21', fontSize:11, fontWeight:700, borderRadius:'50%', minWidth:20, height:20, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', flexShrink:0 }}>
-            {chat.unreadCount>99 ? '99+' : chat.unreadCount}
-          </span>
-        )}
-      </div>
-    </div>
+    <span style={{ color:C.textPri, fontSize:15 }}>{label}</span>
   </div>
 );
 
