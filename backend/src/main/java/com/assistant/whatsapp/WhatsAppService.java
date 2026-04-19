@@ -1,7 +1,6 @@
 package com.assistant.whatsapp;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -11,11 +10,8 @@ import java.util.Map;
 @Service
 public class WhatsAppService {
 
-    @Value("${WHATSAPP_ACCESS_TOKEN:}")
-    private String accessToken;
-
-    @Value("${WHATSAPP_PHONE_NUMBER_ID:}")
-    private String phoneNumberId;
+    @Value("${BRIDGE_URL:http://whatsapp-bridge:3001}")
+    private String bridgeUrl;
 
     private final WebClient webClient;
 
@@ -23,32 +19,27 @@ public class WhatsAppService {
         this.webClient = webClientBuilder.build();
     }
 
-    public void sendTextMessage(String to, String text) {
-        if (accessToken == null || accessToken.isEmpty() || phoneNumberId == null || phoneNumberId.isEmpty()) {
-            System.err.println("WhatsApp Cloud API not configured. Missing Access Token or Phone Number ID.");
-            return;
+    /**
+     * Sends a text message via the native whatsapp-bridge.
+     * @param to The recipient's JID (e.g., "1234567890@s.whatsapp.net") or group JID.
+     * @param text The message content.
+     * @return The bridge response map.
+     */
+    public Map<String, Object> sendTextMessage(String to, String text) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = webClient.post()
+                .uri(bridgeUrl + "/send")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("to", to, "content", text))
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block(java.time.Duration.ofSeconds(10));
+
+            return result != null ? result : Map.of("success", true);
+        } catch (Exception e) {
+            System.err.println("WhatsApp Bridge error: " + e.getMessage());
+            return Map.of("success", false, "error", e.getMessage());
         }
-
-        String url = String.format("https://graph.facebook.com/v18.0/%s/messages", phoneNumberId);
-
-        Map<String, Object> body = Map.of(
-            "messaging_product", "whatsapp",
-            "recipient_type", "individual",
-            "to", to,
-            "type", "text",
-            "text", Map.of("body", text)
-        );
-
-        webClient.post()
-            .uri(url)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body)
-            .retrieve()
-            .bodyToMono(String.class)
-            .subscribe(
-                response -> System.out.println("WhatsApp message sent: " + response),
-                error -> System.err.println("WhatsApp sending error: " + error.getMessage())
-            );
     }
 }

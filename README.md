@@ -110,41 +110,30 @@ Once the stack is started, access your live deployment via `http://localhost:517
 3. Run frontend Vite server: `cd frontend && npm run dev`
 4. Access `http://localhost:5173`. The Vite proxy will securely map `/api` and `/login` HTTP transactions dynamically.
 
-### 3. Meta Business (WhatsApp) Configuration
+### 3. Native WhatsApp Bridge Configuration
 
-To enable the WhatsApp integration, you need three tokens from Meta's developer platform:
+The application features a built-in WhatsApp bridge that connects directly to the WhatsApp protocol (multi-device) via the [Baileys](https://github.com/WhiskeySockets/Baileys) library. This allows you to "link" your own personal WhatsApp account by simply scanning a QR code, exactly like WhatsApp Web.
 
-| Environment Variable | Purpose | Where to Get It |
-| :--- | :--- | :--- |
-| `WHATSAPP_ACCESS_TOKEN` | Authenticates API calls to the WhatsApp Cloud API | [Meta App Dashboard → WhatsApp → API Setup](https://developers.facebook.com/apps/) |
-| `WHATSAPP_PHONE_NUMBER_ID` | Identifies your business phone number for sending/receiving | [Meta App Dashboard → WhatsApp → API Setup](https://developers.facebook.com/apps/) |
-| `WHATSAPP_VERIFY_TOKEN` | A custom secret string you define to verify webhook handshakes | You choose this value yourself (any string) |
+**No Meta Business API or developer tokens are required.**
 
 #### Step-by-step Setup
 
-1.  **Create a Meta App**:
-    *   Go to the [Meta for Developers](https://developers.facebook.com/) portal and log in.
-    *   Click [**Create App**](https://developers.facebook.com/apps/create/) → select **Business** type → add the **WhatsApp** product.
+1.  **Start the Stack**:
+    *   Ensure the `whatsapp-bridge` container is running (it starts automatically with `./start.sh`).
+    *   The bridge defaults to port `3001` and is proxied by the backend.
 
-2.  **Get your Access Token and Phone Number ID**:
-    *   In your app dashboard, navigate to **WhatsApp → API Setup** (left sidebar).
-    *   You will see a **Temporary Access Token** — click **Generate** to create one. For a permanent token, go to [**Business Settings → System Users**](https://business.facebook.com/settings/system-users/) and generate a permanent token with `whatsapp_business_messaging` permission.
-    *   On the same API Setup page, your **Phone Number ID** is displayed under the "From" phone number dropdown.
+2.  **Link your Device**:
+    *   Open the application and navigate to the **WhatsApp** page (`/whatsapp`).
+    *   If not authenticated, a **QR Code** will appear on the screen.
+    *   Open WhatsApp on your phone → `Settings` → `Linked Devices` → `Link a Device`.
+    *   Scan the QR code displayed in the assistant dashboard.
 
-3.  **Configure the Webhook** (for receiving incoming messages):
-    *   In your app dashboard, go to **WhatsApp → Configuration**.
-    *   Set the **Callback URL** to: `https://your-domain.ngrok-free.app/api/whatsapp/webhook`
-    *   Set the **Verify Token** to any custom string you choose (e.g., `my_secret_token_2026`).
-    *   Use the same value as your `WHATSAPP_VERIFY_TOKEN` in the `.env` file.
-    *   Subscribe to the **messages** field.
+3.  **Synchronization**:
+    *   Once scanned, the bridge will automatically synchronize your recent chat history and contacts into the local PostgreSQL database.
+    *   Incoming messages will be pushed in real-time to the dashboard via Socket.io.
 
-4.  **Set your Owner Phone Number**:
-    *   Open the application at `http://localhost:5173/configuration`.
-    *   Under **WhatsApp Owner Phone**, enter your number in international format: `+33123456789`.
-    *   All four WhatsApp keys can also be configured from the same page.
-
-5.  **Business Verification** (recommended):
-    *   To prevent service interruptions, verify your Meta Business account in the [Security Center](https://business.facebook.com/latest/settings/security_center).
+4.  **AI Assistant Tooling**:
+    *   The AI Assistant can now natively send messages through your linked account. You can ask: *"Send a WhatsApp to Carlos saying I'm running late."*
 
 
 ## Security & Privacy Considerations
