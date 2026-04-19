@@ -118,16 +118,18 @@ public class WhatsAppBridgeController {
         Optional<WhatsAppMessage> existing = messageRepository.findByMessageWaId(messageWaId);
         if (existing.isPresent()) return ResponseEntity.ok().build();
 
-        String chatId     = (String) payload.get("chatId");
-        String senderId   = (String) payload.getOrDefault("senderId", "unknown");
-        String senderName = (String) payload.get("chatName");
-        String body       = (String) payload.getOrDefault("body", "");
-        boolean fromMe    = Boolean.TRUE.equals(payload.get("fromMe"));
-        String direction  = fromMe ? "OUTGOING" : "INCOMING";
-        String mediaType  = (String) payload.get("mediaType");
-        String authorName = (String) payload.get("authorName");
-        String authorPhone = (String) payload.get("authorPhone");
-        String quotedMsg  = (String) payload.get("quotedMsg");
+        String  chatId     = (String)  payload.get("chatId");
+        String  senderId   = (String)  payload.getOrDefault("senderId", "unknown");
+        String  senderName = (String)  payload.get("chatName");   // push name
+        String  body       = (String)  payload.getOrDefault("body", "");
+        boolean fromMe     = Boolean.TRUE.equals(payload.get("fromMe"));
+        boolean isGroup    = Boolean.TRUE.equals(payload.get("isGroup"));
+        String  direction  = fromMe ? "OUTGOING" : "INCOMING";
+        String  mediaType  = (String)  payload.get("mediaType");
+        String  authorName = (String)  payload.get("authorName");
+        String  authorPhone= (String)  payload.get("authorPhone");
+        String  quotedMsg  = (String)  payload.get("quotedMsg");
+        String  rawPayload = (String)  payload.get("rawPayload");
 
         // Media
         String mediaBase64 = null;
@@ -135,17 +137,16 @@ public class WhatsAppBridgeController {
         @SuppressWarnings("unchecked")
         Map<String, Object> mediaData = (Map<String, Object>) payload.get("mediaData");
         if (mediaData != null) {
-            mediaBase64 = (String) mediaData.get("data");
-            mediaMimetype = (String) mediaData.get("mimetype");
+            mediaBase64  = (String) mediaData.get("data");
+            mediaMimetype= (String) mediaData.get("mimetype");
         }
 
         // Timestamp
         LocalDateTime timestamp = LocalDateTime.now();
         String tsStr = (String) payload.get("timestamp");
         if (tsStr != null) {
-            try {
-                timestamp = OffsetDateTime.parse(tsStr).toLocalDateTime();
-            } catch (Exception ignored) {}
+            try { timestamp = OffsetDateTime.parse(tsStr).toLocalDateTime(); }
+            catch (Exception ignored) {}
         }
 
         WhatsAppMessage msg = new WhatsAppMessage(
@@ -153,19 +154,44 @@ public class WhatsAppBridgeController {
             body, direction, mediaType,
             mediaBase64, mediaMimetype,
             authorName, authorPhone,
-            quotedMsg, timestamp
+            quotedMsg, timestamp,
+            rawPayload
         );
-
         messageRepository.save(msg);
 
-        // Update chat's last message
+        // ── Update the parent chat's metadata ──────────────────────────────────
         if (chatId != null) {
-            final LocalDateTime finalTimestamp = timestamp;
-            final String finalBody = body;
-            final String finalMediaType = mediaType;
+            final LocalDateTime ts        = timestamp;
+            final String        finalBody = body;
+            final String        mt        = mediaType;
+            final String        pushName  = senderName;
+            final boolean       incoming  = !fromMe;
+            final boolean       group     = isGroup;
+
             chatRepository.findByChatId(chatId).ifPresent(chat -> {
-                chat.setLastMessage(finalBody.isEmpty() && finalMediaType != null ? "📎 " + finalMediaType.toLowerCase() : finalBody);
-                chat.setLastMessageTimestamp(finalTimestamp);
+                // ① Resolve display name for 1:1 chats from incoming message push name
+                //    (push name = the contact's own WhatsApp display name)
+                if (!group && incoming && pushName != null && !pushName.isBlank()) {
+                    String cur = chat.getName();
+                    boolean curIsPhone = cur == null || cur.matches("[+\\d\\s\\-\\.]+");
+                    boolean newIsReal  = !pushName.matches("[+\\d\\s\\-\\.]+");
+                    if (curIsPhone && newIsReal) {
+                        chat.setName(pushName);
+                    }
+                }
+                // ② Resolve group display name from message's chatName field
+                //    (group messages carry the group name as chatName)
+                if (group && pushName != null && !pushName.isBlank()) {
+                    String cur = chat.getName();
+                    boolean curIsPhone = cur == null || cur.matches("[+\\d\\s\\-\\.]+");
+                    if (curIsPhone) chat.setName(pushName);
+                }
+                // ③ Update last-message preview and timestamp
+                String preview = (!finalBody.isEmpty())
+                    ? finalBody
+                    : (mt != null ? "📎 " + mt.toLowerCase() : "");
+                chat.setLastMessage(preview);
+                chat.setLastMessageTimestamp(ts);
                 chat.setUpdatedAt(LocalDateTime.now());
                 chatRepository.save(chat);
             });
@@ -173,33 +199,118 @@ public class WhatsAppBridgeController {
 
         return ResponseEntity.ok().build();
     }
+    @PostMapping("/bridge/chat-preview")
+    public ResponseEntity<Void> updateChatPreview(@RequestBody Map<String, Object> payload) {
+        String chatId = (String) payload.get("chatId");
+        String lastMsg = (String) payload.get("lastMessage");
+        String tsStr = (String) payload.get("lastMessageTimestamp");
+        String direction = (String) payload.get("lastMessageDirection");
+        String pushName = (String) payload.get("pushName");
+
+        if (chatId == null) return ResponseEntity.badRequest().build();
+
+        chatRepository.findByChatId(chatId).ifPresentOrElse(chat -> {
+            if (lastMsg != null) chat.setLastMessage(lastMsg);
+            if (tsStr != null) {
+                try {
+                    chat.setLastMessageTimestamp(LocalDateTime.parse(tsStr.substring(0, 19)));
+                } catch (Exception ignored) {}
+            }
+            if (direction != null) chat.setLastMessageDirection(direction);
+            
+            // Resolve name from pushName if currently a phone number
+            if (pushName != null && !pushName.isBlank()) {
+                String cur = chat.getName();
+                boolean isPhone = cur == null || cur.matches("[+\\d\\s\\-\\.]+");
+                if (isPhone) chat.setName(pushName);
+            }
+            
+            chat.setUpdatedAt(LocalDateTime.now());
+            chatRepository.save(chat);
+        }, () -> {
+            // If chat doesn't exist, create it (happens during history sync sometimes)
+            WhatsAppChat chat = new WhatsAppChat();
+            chat.setChatId(chatId);
+            chat.setName(pushName != null ? pushName : chatId.split("@")[0]);
+            chat.setLastMessage(lastMsg);
+            if (tsStr != null) {
+                try {
+                    chat.setLastMessageTimestamp(LocalDateTime.parse(tsStr.substring(0, 19)));
+                } catch (Exception ignored) {}
+            }
+            chat.setLastMessageDirection(direction);
+            chat.setUpdatedAt(LocalDateTime.now());
+            chatRepository.save(chat);
+        });
+
+        return ResponseEntity.ok().build();
+    }
+
+
 
     // ─── Frontend API: Get All Chats ──────────────────────────────────────────
 
     @GetMapping("/chats")
     public List<WhatsAppChat> getAllChats() {
-        return chatRepository.findAllByOrderByLastMessageTimestampDesc();
+        return chatRepository.findAll();
     }
 
     // ─── Frontend API: Get Messages for a Chat ────────────────────────────────
+    // With Baileys, all messages are pushed into the DB via /bridge/message.
+    // We serve directly from PostgreSQL — no live bridge proxy needed.
 
     @GetMapping("/chats/{chatId:.+}/messages")
     public ResponseEntity<Object> getMessagesForChat(@PathVariable String chatId) {
-        // First try the bridge directly (live, no DB lag)
-        try {
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> bridgeMsgs = webClient.get()
-                .uri(bridgeUrl + "/messages/" + java.net.URLEncoder.encode(chatId, java.nio.charset.StandardCharsets.UTF_8))
-                .retrieve()
-                .bodyToMono(List.class)
-                .block(java.time.Duration.ofSeconds(15));
-            if (bridgeMsgs != null && !bridgeMsgs.isEmpty()) {
-                return ResponseEntity.ok(bridgeMsgs);
-            }
-        } catch (Exception e) {
-            // Bridge unavailable or fetchMessages failed — fall through to DB
-        }
-        // Fallback: serve from DB (previously synced messages)
-        return ResponseEntity.ok(messageRepository.findByChatIdOrderByTimestampAsc(chatId));
+        List<WhatsAppMessage> messages = messageRepository.findByChatIdOrderByTimestampAsc(chatId);
+        return ResponseEntity.ok(messages);
     }
+
+    // ─── Bridge Ingest: Contact Name Update ───────────────────────────────────
+    // Called by the contacts.upsert Baileys event to patch display names.
+    // Only updates the name field — preserves all other chat data.
+
+    @PostMapping("/bridge/contact-name")
+    public ResponseEntity<Void> updateContactName(@RequestBody Map<String, Object> payload) {
+        String chatId = (String) payload.get("chatId");
+        String name   = (String) payload.get("name");
+        if (chatId == null || name == null || name.isBlank()) return ResponseEntity.badRequest().build();
+
+        chatRepository.findByChatId(chatId).ifPresent(chat -> {
+            // Only update if currently a phone number, raw JID, or numeric ID
+            String cur = chat.getName();
+            boolean isReplaceable = cur == null || 
+                              cur.matches("[+\\d\\s\\-\\.]+") || // Raw numbers
+                              cur.matches("\\d{10,}") ||      // Long numeric IDs
+                              cur.contains("@") ||              // Full JIDs
+                              cur.contains("-");                // JIDs with hyphen (common in groups)
+            
+            if (isReplaceable) {
+                chat.setName(name);
+                chat.setUpdatedAt(LocalDateTime.now());
+                chatRepository.save(chat);
+            }
+        });
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/messages/wa/{waId}")
+    public ResponseEntity<WhatsAppMessage> getMessageByWaId(@PathVariable String waId) {
+        return messageRepository.findByMessageWaId(waId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Nuclear Clear: wipe all WhatsApp data from the database.
+     * Called by the bridge during a Hard Reset.
+     */
+    @PostMapping("/bridge/clear-all")
+    public ResponseEntity<Void> clearAllData() {
+        System.out.println("[Backend] ☢️ Nuclear Clear: Wiping all WhatsApp messages and chats...");
+        messageRepository.deleteAll();
+        chatRepository.deleteAll();
+        return ResponseEntity.ok().build();
+    }
+
 }
+

@@ -1,33 +1,20 @@
 FROM node:20-alpine
 
-# Install Chromium and its dependencies
-RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    harfbuzz \
-    ca-certificates \
-    ttf-freefont \
-    dumb-init
-
-# Tell Puppeteer to use the installed Chromium
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    CHROMIUM_PATH=/usr/bin/chromium \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+RUN apk add --no-cache dumb-init
 
 WORKDIR /app
 
+# Copy pre-built node_modules (installed on host to avoid Docker OOM)
+COPY node_modules ./node_modules
 COPY package.json ./
-RUN npm install --production
-
 COPY index.js ./
 
-# Run as non-root for security
-RUN addgroup -S pptruser && adduser -S -G pptruser pptruser \
+# Run as non-root
+RUN addgroup -S wauser && adduser -S -G wauser wauser \
     && mkdir -p /app/sessions \
-    && chown -R pptruser:pptruser /app
+    && chown -R wauser:wauser /app
 
-USER pptruser
+USER wauser
 
 EXPOSE 3001
 

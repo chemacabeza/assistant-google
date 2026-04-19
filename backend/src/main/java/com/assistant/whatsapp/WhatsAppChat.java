@@ -23,6 +23,7 @@ public class WhatsAppChat {
     private String lastMessage;
 
     private LocalDateTime lastMessageTimestamp;
+    private String lastMessageDirection; // INCOMING or OUTGOING
 
     private int unreadCount;
 
@@ -43,6 +44,8 @@ public class WhatsAppChat {
     public void setLastMessage(String lastMessage) { this.lastMessage = lastMessage; }
     public LocalDateTime getLastMessageTimestamp() { return lastMessageTimestamp; }
     public void setLastMessageTimestamp(LocalDateTime lastMessageTimestamp) { this.lastMessageTimestamp = lastMessageTimestamp; }
+    public String getLastMessageDirection() { return lastMessageDirection; }
+    public void setLastMessageDirection(String lastMessageDirection) { this.lastMessageDirection = lastMessageDirection; }
     public int getUnreadCount() { return unreadCount; }
     public void setUnreadCount(int unreadCount) { this.unreadCount = unreadCount; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

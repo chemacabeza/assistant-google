@@ -68,6 +68,8 @@ services:
       context: ./whatsapp-bridge
       dockerfile: Dockerfile
     container_name: assistant-whatsapp-bridge
+    ports:
+      - "3001:3001"
     environment:
       - BACKEND_URL=http://backend:8080
       - SESSION_DIR=/app/sessions

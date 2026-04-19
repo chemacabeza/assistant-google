@@ -61,6 +61,9 @@ public class WhatsAppMessage {
 
     private String authorPhone; // For group messages: sender's phone number
 
+    @Column(columnDefinition = "TEXT")
+    private String rawPayload; // Raw Baileys message for late-downloading media
+
     public WhatsAppMessage() {}
 
     public WhatsAppMessage(User user, String senderId, String senderName, String content, String direction, String messageSid) {
@@ -77,7 +80,8 @@ public class WhatsAppMessage {
                            String content, String direction, String mediaType,
                            String mediaBase64, String mediaMimetype,
                            String authorName, String authorPhone,
-                           String repliedToContent, LocalDateTime timestamp) {
+                           String repliedToContent, LocalDateTime timestamp,
+                           String rawPayload) {
         this.chatId = chatId;
         this.messageWaId = messageWaId;
         this.senderId = senderId;
@@ -91,6 +95,7 @@ public class WhatsAppMessage {
         this.authorPhone = authorPhone;
         this.repliedToContent = repliedToContent;
         this.timestamp = timestamp;
+        this.rawPayload = rawPayload;
     }
 
     // Getters and Setters
@@ -132,4 +137,6 @@ public class WhatsAppMessage {
     public void setAuthorName(String authorName) { this.authorName = authorName; }
     public String getAuthorPhone() { return authorPhone; }
     public void setAuthorPhone(String authorPhone) { this.authorPhone = authorPhone; }
+    public String getRawPayload() { return rawPayload; }
+    public void setRawPayload(String rawPayload) { this.rawPayload = rawPayload; }
 }
