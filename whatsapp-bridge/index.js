@@ -286,6 +286,7 @@ async function startBridge() {
       } else if (statusCode !== DisconnectReason.connectionClosed) {
         // Temporary disconnect — reconnect automatically
         console.log('[Bridge] Reconnecting in 3 s...');
+        sock?.ws?.close();
         setTimeout(startBridge, 3000);
       }
     }
