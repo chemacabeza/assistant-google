@@ -42,16 +42,28 @@ public class WhatsAppBridgeController {
     @GetMapping("/bridge/status")
     public ResponseEntity<Map<String, Object>> getBridgeStatus() {
         try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> status = webClient.get()
-                .uri(bridgeUrl + "/status")
-                .retrieve()
-                .bodyToMono(Map.class)
-                .block(java.time.Duration.ofSeconds(3));
+            Map<String, Object> status = fetchStatusFromBridge();
             return ResponseEntity.ok(status != null ? status : Map.of("authenticated", false, "ready", false, "hasQr", false));
         } catch (Exception e) {
             return ResponseEntity.ok(Map.of("authenticated", false, "ready", false, "hasQr", false, "error", e.getMessage()));
         }
+    }
+
+    private Map<String, Object> fetchStatusFromBridge() {
+        try {
+            return webClient.get()
+                .uri(bridgeUrl + "/status")
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block(java.time.Duration.ofSeconds(2));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private boolean isBridgeReady() {
+        Map<String, Object> status = fetchStatusFromBridge();
+        return status != null && Boolean.TRUE.equals(status.get("ready"));
     }
 
     // ─── Bridge Proxy: QR Image ───────────────────────────────────────────────
@@ -191,7 +203,9 @@ public class WhatsAppBridgeController {
                     ? finalBody
                     : (mt != null ? "📎 " + mt.toLowerCase() : "");
                 chat.setLastMessage(preview);
+                chat.setLastMediaType(mt);
                 chat.setLastMessageTimestamp(ts);
+                chat.setLastMessageDirection(direction);
                 chat.setUpdatedAt(LocalDateTime.now());
                 chatRepository.save(chat);
             });
@@ -206,11 +220,13 @@ public class WhatsAppBridgeController {
         String tsStr = (String) payload.get("lastMessageTimestamp");
         String direction = (String) payload.get("lastMessageDirection");
         String pushName = (String) payload.get("pushName");
+        String mediaType = (String) payload.get("mediaType");
 
         if (chatId == null) return ResponseEntity.badRequest().build();
 
         chatRepository.findByChatId(chatId).ifPresentOrElse(chat -> {
             if (lastMsg != null) chat.setLastMessage(lastMsg);
+            chat.setLastMediaType(mediaType); // null clears it for text-only msgs
             if (tsStr != null) {
                 try {
                     chat.setLastMessageTimestamp(LocalDateTime.parse(tsStr.substring(0, 19)));
@@ -233,6 +249,7 @@ public class WhatsAppBridgeController {
             chat.setChatId(chatId);
             chat.setName(pushName != null ? pushName : chatId.split("@")[0]);
             chat.setLastMessage(lastMsg);
+            chat.setLastMediaType(mediaType);
             if (tsStr != null) {
                 try {
                     chat.setLastMessageTimestamp(LocalDateTime.parse(tsStr.substring(0, 19)));
@@ -252,7 +269,10 @@ public class WhatsAppBridgeController {
 
     @GetMapping("/chats")
     public List<WhatsAppChat> getAllChats() {
-        return chatRepository.findAll();
+        if (!isBridgeReady()) {
+            return List.of();
+        }
+        return chatRepository.findAllByOrderByLastMessageTimestampDesc();
     }
 
     // ─── Frontend API: Get Messages for a Chat ────────────────────────────────
@@ -261,6 +281,9 @@ public class WhatsAppBridgeController {
 
     @GetMapping("/chats/{chatId:.+}/messages")
     public ResponseEntity<Object> getMessagesForChat(@PathVariable String chatId) {
+        if (!isBridgeReady()) {
+            return ResponseEntity.ok(List.of());
+        }
         List<WhatsAppMessage> messages = messageRepository.findByChatIdOrderByTimestampAsc(chatId);
         return ResponseEntity.ok(messages);
     }
@@ -310,6 +333,80 @@ public class WhatsAppBridgeController {
         messageRepository.deleteAll();
         chatRepository.deleteAll();
         return ResponseEntity.ok().build();
+    }
+
+    // ─── Proxy: Send Message ─────────────────────────────────────────────────
+    // Frontend POSTs to /api/whatsapp/send → backend proxies to bridge /send.
+    // This fixes the route mismatch (frontend expected /api/whatsapp/send).
+
+    @PostMapping("/send")
+    public ResponseEntity<Object> sendMessage(@RequestBody Map<String, String> request) {
+        String to      = request.get("to");
+        String content = request.get("content");
+        if (to == null || content == null) return ResponseEntity.badRequest().build();
+
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = webClient.post()
+                .uri(bridgeUrl + "/send")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("to", to, "content", content))
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block(java.time.Duration.ofSeconds(10));
+            return ResponseEntity.ok(result != null ? result : Map.of("success", true));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
+    // ─── Proxy: Logout ───────────────────────────────────────────────────────
+    // Frontend POSTs to /api/whatsapp/bridge/logout → backend proxies to bridge /logout.
+
+    @PostMapping("/bridge/logout")
+    public ResponseEntity<Map<String, Object>> proxyLogout() {
+        System.out.println("[Backend] 🔴 Logout proxy requested");
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = webClient.post()
+                .uri(bridgeUrl + "/logout")
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block(java.time.Duration.ofSeconds(10));
+            // Also clear backend DB
+            messageRepository.deleteAll();
+            chatRepository.deleteAll();
+            return ResponseEntity.ok(result != null ? result : Map.of("success", true));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
+    // ─── Proxy: Hard Reset ───────────────────────────────────────────────────
+    // Frontend POSTs to /api/whatsapp/bridge/reset → backend proxies to bridge /reset.
+    // The bridge's /reset also calls /bridge/clear-all, but we wipe here too for safety.
+
+    @PostMapping("/bridge/reset")
+    public ResponseEntity<Map<String, Object>> proxyReset() {
+        System.out.println("[Backend] ☢️ Hard Reset proxy requested");
+        try {
+            // Wipe backend DB first (bridge may not reach /clear-all if it exits)
+            messageRepository.deleteAll();
+            chatRepository.deleteAll();
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = webClient.post()
+                .uri(bridgeUrl + "/reset")
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block(java.time.Duration.ofSeconds(10));
+            return ResponseEntity.ok(result != null ? result : Map.of("success", true, "message", "Reset triggered"));
+        } catch (Exception e) {
+            // Bridge may have already exited — that's expected behavior
+            return ResponseEntity.ok(Map.of("success", true, "message", "Reset triggered (bridge restarting)"));
+        }
     }
 
 }

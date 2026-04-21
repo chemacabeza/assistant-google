@@ -27,6 +27,8 @@ public class WhatsAppChat {
 
     private int unreadCount;
 
+    private String lastMediaType; // IMAGE, VIDEO, AUDIO, etc.
+
     private LocalDateTime updatedAt;
 
     public WhatsAppChat() {}
@@ -48,6 +50,8 @@ public class WhatsAppChat {
     public void setLastMessageDirection(String lastMessageDirection) { this.lastMessageDirection = lastMessageDirection; }
     public int getUnreadCount() { return unreadCount; }
     public void setUnreadCount(int unreadCount) { this.unreadCount = unreadCount; }
+    public String getLastMediaType() { return lastMediaType; }
+    public void setLastMediaType(String lastMediaType) { this.lastMediaType = lastMediaType; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

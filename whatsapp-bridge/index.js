@@ -147,13 +147,8 @@ async function syncMessage(rawMsg) {
   const mediaType = getMediaType(msgContent);
   const fromMe    = rawMsg.key?.fromMe || false;
   const direction = fromMe ? 'OUTGOING' : 'INCOMING';
-  
-  // Try to resolve push name if present
-  let pushName = rawMsg.pushName || null;
-  if (!pushName && !fromMe && group) {
-     // For group messages, Baileys sometimes puts participant push name in message object
-  }
   const group     = isJidGroup(chatId);
+  
   let tsInt = rawMsg.messageTimestamp;
   if (tsInt && typeof tsInt === 'object' && tsInt.low) tsInt = tsInt.low;
   else if (tsInt && typeof tsInt === 'object' && tsInt.toNumber) tsInt = tsInt.toNumber();
@@ -198,6 +193,7 @@ async function syncMessage(rawMsg) {
     lastMessageTimestamp: ts,
     lastMessageDirection: direction,
     pushName:             (!fromMe && !group) ? rawMsg.pushName : null,
+    mediaType:            mediaType || null,
   });
 }
 
@@ -336,101 +332,9 @@ async function startBridge() {
     console.log(`[Bridge] ✅ History sync complete — ${chatsSynced} chats, ${msgsSynced} messages, ${nameMap.size} names resolved`);
     io.emit('history_synced', { chats: chatsSynced, messages: msgsSynced });
 
-    // Trigger secondary deep sync after 5 seconds to catch stragglers in the store
-    setInterval(async () => {
-      // ── New: Ultra-Aggressive Identity Resolution ──
-      const chatsFromStore = store.chats.all();
-      console.log(`[Bridge] 🔍 Deep scanning ${chatsFromStore.length} chats for unresolved identities...`);
-      
-      for (const chat of chatsFromStore) {
-        const jid = chat.id || chat.jid;
-        if (!jid || isJidBroadcast(jid)) continue;
-
-        // 1. Resolve Groups
-        if (jid.endsWith('@g.us')) {
-          try {
-            const meta = await sock.groupMetadata(jid);
-            if (meta.subject) {
-              console.log(`[Bridge] 👨‍👩‍👧‍👦 Resolved Group: ${meta.subject}`);
-              await safePost('/api/whatsapp/bridge/contact-name', { chatId: jid, name: meta.subject });
-            }
-          } catch (err) {
-            // Group metadata failed (left group or community internal)
-          }
-        } 
-        // 2. Resolve Contacts
-        else if (jid.endsWith('@s.whatsapp.net')) {
-          const contact = store.contacts[jid];
-          const resolvedName = contact?.notify || contact?.name;
-          if (resolvedName) {
-            await safePost('/api/whatsapp/bridge/contact-name', { chatId: jid, name: resolvedName });
-          } else {
-            // Last resort: query presence to trigger a notify push from WA
-            try { await sock.presenceSubscribe(jid); } catch (e) {}
-          }
-        }
-        await new Promise(r => setTimeout(r, 100)); // Rate limit
-      }
-      io.emit('contacts_resolved', { count: 'final' });
-
-      // ── New: Identity Healer (Periodic) ──
-      // ── New: Backend-Driven Identity Healer (Zero-Gap) ──
-      const resolveIdentities = async () => {
-        if (!sock || isConnected === false) return;
-        
-        try {
-          const { data: chats } = await axios.get(`${BACKEND_URL}/api/whatsapp/chats`);
-          console.log(`[Bridge] 🩺 Healer: Fetched ${chats.length} chats from backend. Checking for raw IDs...`);
-          let resolvedInThisPass = 0;
-          
-          for (const chat of chats) {
-            const jid = chat.chatId;
-            const name = chat.name || '';
-            const isNumeric = /^[0-9-]+$/.test(name) || name === jid || name.includes('@');
-            
-            if (isNumeric && (jid.endsWith('@g.us') || jid.endsWith('@s.whatsapp.net'))) {
-              try {
-                if (jid.endsWith('@g.us')) {
-                  console.log(`[Bridge] 🩺 Healer: Resolving group metadata for ${jid}...`);
-                  const meta = await sock.groupMetadata(jid);
-                  if (meta.subject) {
-                    await safePost('/api/whatsapp/bridge/contact-name', { chatId: jid, name: meta.subject });
-                    resolvedInThisPass++;
-                  }
-                } else {
-                  console.log(`[Bridge] 🩺 Healer: Resolving contact name for ${jid}...`);
-                  const [result] = await sock.onWhatsApp(jid);
-                  if (result && result.exists) {
-                    // Contact exists, push update will occur via store/upsert events
-                    // but for immediate resolution we try to find it in store
-                    const contact = store.contacts[jid];
-                    if (contact?.notify || contact?.name) {
-                      await safePost('/api/whatsapp/bridge/contact-name', { chatId: jid, name: contact.notify || contact.name });
-                      resolvedInThisPass++;
-                    }
-                  }
-                }
-              } catch (e) {
-                // Rate limit or not authorized
-              }
-              await new Promise(r => setTimeout(r, 500)); // Rate limit
-            }
-          }
-          
-          if (resolvedInThisPass > 0) {
-            console.log(`[Bridge] 🩺 Resolved ${resolvedInThisPass} identities. Re-scanning in 30s.`);
-            setTimeout(resolveIdentities, 30000);
-          } else {
-            console.log('[Bridge] 🩺 All backup identities look stable. Re-scanning in 2m.');
-            setTimeout(resolveIdentities, 120000);
-          }
-        } catch (e) {
-          console.error('[Bridge] 🩺 Healer failed to fetch chats from backend:', e.message);
-          setTimeout(resolveIdentities, 60000);
-        }
-      };
-      
-      resolveIdentities();
+    // Trigger a one-time deep scan after history sync completes
+    setTimeout(async () => {
+      await runIdentityResolution();
     }, 5000);
   });
 
@@ -516,41 +420,68 @@ async function startBridge() {
     }
   });
 
-  // Remove duplicate messaging-history.set handler and replace with generic connection logger
-  sock.ev.on('connection.update', async ({ connection }) => {
-    if (connection === 'open') {
-       console.log('[Bridge] 🟢 Connection stable. Starting Zero-Gap identity resolution...');
-       isConnected = true;
-       
-       // Give WA a moment to push the store
-       setInterval(async () => {
-         const chats = store.chats.all();
-         console.log(`[Bridge] 🩺 Healer: Scanning ${chats.length} chats for raw IDs...`);
-         for (const chat of chats) {
-           if (!sock) break;
-           const jid = chat.id || chat.jid;
-           if (jid && (jid.endsWith('@g.us') || jid.endsWith('@s.whatsapp.net'))) {
-             // If name is missing or is just the ID
-             if (!chat.name || chat.name === jid || /^[0-9-]+$/.test(chat.name)) {
-               try {
-                 if (jid.endsWith('@g.us')) {
-                   const m = await sock.groupMetadata(jid);
-                   if (m.subject) await safePost('/api/whatsapp/bridge/contact-name', { chatId: jid, name: m.subject });
-                 } else {
-                   const contact = store.contacts[jid];
-                   if (contact?.notify || contact?.name) {
-                     await safePost('/api/whatsapp/bridge/contact-name', { chatId: jid, name: contact.notify || contact.name });
-                   }
-                 }
-                 await new Promise(r => setTimeout(r, 200)); // Rate limit
-               } catch (e) {}
-             }
-           }
-         }
-         console.log('[Bridge] 🩺 Zero-Gap identity resolution pass complete.');
-       }, 10000);
+}
+
+// ── Centralized Identity Resolution (runs once, then schedules itself) ────────
+async function runIdentityResolution() {
+  if (!sock || !isConnected) return;
+  
+  try {
+    // Phase 1: Resolve from Baileys store
+    const chatsFromStore = store.chats?.all?.() || [];
+    for (const chat of chatsFromStore) {
+      const jid = chat.id || chat.jid;
+      if (!jid || isJidBroadcast(jid)) continue;
+      if (jid.endsWith('@g.us')) {
+        try {
+          const meta = await sock.groupMetadata(jid);
+          if (meta.subject) await safePost('/api/whatsapp/bridge/contact-name', { chatId: jid, name: meta.subject });
+        } catch {}
+      } else if (jid.endsWith('@s.whatsapp.net')) {
+        const contact = store.contacts?.[jid];
+        const name = contact?.notify || contact?.name;
+        if (name) await safePost('/api/whatsapp/bridge/contact-name', { chatId: jid, name });
+      }
+      await new Promise(r => setTimeout(r, 100));
     }
-  });
+    io.emit('contacts_resolved', { count: chatsFromStore.length });
+
+    // Phase 2: Heal any remaining raw-ID names from backend
+    const { data: dbChats } = await axios.get(`${BACKEND_URL}/api/whatsapp/chats`).catch(() => ({ data: [] }));
+    let resolved = 0;
+    for (const chat of dbChats) {
+      const jid = chat.chatId;
+      const name = chat.name || '';
+      const isRaw = /^[0-9+\-]+$/.test(name) || name === jid || name.includes('@');
+      if (!isRaw) continue;
+
+      try {
+        if (jid.endsWith('@g.us')) {
+          const meta = await sock.groupMetadata(jid);
+          if (meta.subject) { await safePost('/api/whatsapp/bridge/contact-name', { chatId: jid, name: meta.subject }); resolved++; }
+        } else {
+          const contact = store.contacts?.[jid];
+          if (contact?.notify || contact?.name) {
+            await safePost('/api/whatsapp/bridge/contact-name', { chatId: jid, name: contact.notify || contact.name });
+            resolved++;
+          }
+        }
+      } catch {}
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    if (resolved > 0) {
+      console.log(`[Bridge] 🩺 Healer resolved ${resolved} names. Re-scanning in 30s.`);
+      io.emit('contacts_resolved', { count: resolved });
+      setTimeout(runIdentityResolution, 30000);
+    } else {
+      console.log('[Bridge] 🩺 All identities stable. Next scan in 2m.');
+      setTimeout(runIdentityResolution, 120000);
+    }
+  } catch (e) {
+    console.error('[Bridge] 🩺 Identity resolution error:', e.message);
+    setTimeout(runIdentityResolution, 60000);
+  }
 }
 
 // ── HTTP REST API ─────────────────────────────────────────────────────────────
@@ -703,31 +634,36 @@ app.post('/logout', async (req, res) => {
 app.post('/reset', async (req, res) => {
   console.log('[Bridge] ☢️ HARD RESET REQUESTED');
   try {
+    // 1. Forcefully close the socket first
     if (sock) {
-      try { await sock.logout(); } catch (e) {}
-      sock.end();
+      console.log('[Bridge] Closing socket...');
+      sock.ev.removeAllListeners();
+      try { sock.ws.close(); } catch (e) {}
+      sock = null;
     }
-    
-    // 1. Tell backend to wipe its WhatsApp DB tables
+
+    // 2. Tell backend to wipe its database immediately
     console.log('[Bridge] Requesting data purge from backend...');
     await axios.post(`${BACKEND_URL}/api/whatsapp/bridge/clear-all`).catch(e => {
         console.error('[Bridge] Backend purge failed:', e.message);
     });
 
-    // 2. Clear the whole session dir (auth, store, media cache)
+    // 3. NUCLEAR WIPE: Delete the entire session directory
     if (fs.existsSync(SESSION_DIR)) {
-      console.log(`[Bridge] Nuking local session content in ${SESSION_DIR}...`);
-      const files = fs.readdirSync(SESSION_DIR);
-      for (const file of files) {
-          const p = path.join(SESSION_DIR, file);
-          fs.rmSync(p, { recursive: true, force: true });
-      }
+      console.log(`[Bridge] Nuking local session directory: ${SESSION_DIR}`);
+      fs.rmSync(SESSION_DIR, { recursive: true, force: true });
     }
     
-    res.json({ success: true, message: 'Nuclear reset triggered. System is now clean. Restarting bridge...' });
+    isConnected = false;
+    currentQr = null;
     
-    // 3. Immediate exit — Docker will restart everything from scratch
-    setTimeout(() => process.exit(0), 1000);
+    res.json({ success: true, message: 'Nuclear reset successful. Restarting...' });
+    
+    // 4. Force exit after a short delay to allow response to send
+    setTimeout(() => {
+      console.log('[Bridge] Exiting for clean restart...');
+      process.exit(0);
+    }, 500);
   } catch (err) {
     console.error('[Bridge] Hard reset failed:', err.message);
     res.status(500).json({ error: err.message });
@@ -737,7 +673,13 @@ app.post('/reset', async (req, res) => {
 // ── Socket.io ─────────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log('[Bridge] Frontend connected via Socket.io');
-  // Send current state immediately to the newly connected client
+  // Emit comprehensive state so the frontend never misses a QR/ready event
+  socket.emit('state', {
+    connected: isConnected,
+    hasQr:     !!currentQr,
+    qr:        currentQr,
+  });
+  // Also emit legacy events for backward compatibility
   if (currentQr)   socket.emit('qr',    { qr: currentQr });
   if (isConnected) socket.emit('ready', { status: 'connected' });
   socket.on('disconnect', () => console.log('[Bridge] Frontend disconnected'));

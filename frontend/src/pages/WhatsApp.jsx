@@ -4,7 +4,7 @@ import React, {
 import { io } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, MoreVertical, Send, Paperclip, Smile, Mic,
+  Search, MoreVertical, Send, Paperclip, Smile, Mic, Plus,
   CheckCheck, ShieldCheck, Globe, Loader2, X, RefreshCw,
   Image as ImageIcon, FileText, Volume2, Video, Phone, Edit3,
   MessageSquare, Users, CircleDot, Star, Camera, Settings,
@@ -90,7 +90,6 @@ const mediaLabel = type => {
 const Avatar = ({ src, name = '?', id = '', size = 40 }) => {
   const [err, setErr] = useState(false);
   const proxyUrl = id ? `${BRIDGE_WS_URL}/avatar/${encodeURIComponent(id)}` : null;
-  const initial = name ? name.charAt(0).toUpperCase() : '?';
 
   // Prefer the provided src, fallback to bridge proxy, fallback to initials
   const finalSrc = (src && !err) ? src : (!err && proxyUrl ? proxyUrl : null);
@@ -137,15 +136,13 @@ const IconBtn = ({ icon, title, onClick, style = {} }) => (
 /* ─── QR / Bridge Overlay ────────────────────────────────────────────────── */
 const BridgeOverlay = ({ status, qrUrl, onRetry }) => (
   <div style={{
-    position: 'absolute', inset: 0, zIndex: 50,
-    background: C.bg,
-    display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center', gap: 32,
+    position: 'absolute', inset: 0, zIndex: 999,
+    background: '#111b21', // Absolute fresh backdrop
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32,
+    color: '#e9edef'
   }}>
-    {/* Title row */}
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <MessageCircle size={32} color={C.green} />
-      <h1 style={{ color: C.textPri, fontSize: 24, fontWeight: 300, margin: 0 }}>WhatsApp Web</h1>
+    <div style={{ textAlign: 'center', maxWidth: 450 }}>
+      <h1 style={{ fontSize: 28, fontWeight: 300, margin: '0 0 16px', color: '#e9edef' }}>Link a device to use WhatsApp</h1>
     </div>
 
     {/* QR card */}
@@ -171,14 +168,17 @@ const BridgeOverlay = ({ status, qrUrl, onRetry }) => (
       </div>
     )}
 
-    {/* Instructions */}
+    {/* Instructions - Exact User Copy */}
     {status === 'qr' && qrUrl && (
-      <ol style={{ color: C.textSec, fontSize: 14, lineHeight: 1.9, margin: 0, paddingLeft: 20, maxWidth: 320 }}>
-        <li>Open <strong style={{ color: C.textPri }}>WhatsApp</strong> on your Android phone</li>
-        <li>Tap <strong style={{ color: C.textPri }}>⋮ More options</strong> → <strong style={{ color: C.textPri }}>Linked devices</strong></li>
-        <li>Tap <strong style={{ color: C.textPri }}>Link a device</strong></li>
-        <li>Point your phone at this QR code to scan it</li>
-      </ol>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 350 }}>
+        <p style={{ color: '#8696a0', fontSize: 14, margin: '0 0 4px' }}>To use WhatsApp on your computer:</p>
+        <ol style={{ color: '#e9edef', fontSize: 16, lineHeight: 2.2, margin: 0, paddingLeft: 24 }}>
+          <li>Open <strong style={{ fontWeight: 600 }}>WhatsApp</strong> on your phone</li>
+          <li>Go to <strong style={{ fontWeight: 600 }}>Linked Devices</strong></li>
+          <li>Tap <strong style={{ fontWeight: 600 }}>“Link a Device”</strong></li>
+          <li>Scan the QR code shown at <code style={{ color: C.green, background: 'rgba(0,168,132,.1)', padding: '2px 4px', borderRadius: 4 }}>localhost:5173</code></li>
+        </ol>
+      </div>
     )}
 
     {/* Offline error */}
@@ -263,6 +263,19 @@ const Bubble = ({ msg }) => {
           wordBreak:    'break-word',
         }}
       >
+        {/* Author name for incoming group messages */}
+        {!out && msg.authorName && (
+          <div style={{ 
+            color: avatarBg(msg.authorPhone || msg.authorName), 
+            fontSize: 13, 
+            fontWeight: 500, 
+            marginBottom: 2, 
+            cursor: 'pointer' 
+          }}>
+            {msg.authorName}
+          </div>
+        )}
+
         {/* Quoted message */}
         {msg.repliedToContent && (
           <div style={{ borderLeft: `3px solid ${out ? 'rgba(255,255,255,.4)' : C.green}`, paddingLeft: 8, marginBottom: 6, borderRadius: 2 }}>
@@ -390,11 +403,18 @@ const WhatsApp = () => {
   const [socketOk, setSocketOk]         = useState(false);
   const [showMenu, setShowMenu]         = useState(false);
   const [resetting, setResetting]       = useState(false);
+  
+  // Track stale session checks
+  const [staleCheckDone, setStaleCheckDone] = useState(false);
 
   const endRef      = useRef(null);
   const socketRef   = useRef(null);
+  const menuRef     = useRef(null);
   const selectedRef = useRef(selected);
+  const chatsRef    = useRef(chats);
+  
   useEffect(() => { selectedRef.current = selected; }, [selected]);
+  useEffect(() => { chatsRef.current = chats; }, [chats]);
 
   const fetchMessages = useCallback(async (chatId) => {
     if (!chatId) return;
@@ -435,6 +455,36 @@ const WhatsApp = () => {
     socket.on('connect', () => {
       console.log('[WA] Socket.io connected to bridge');
       setSocketOk(true);
+      // Immediately check status via REST in case we missed events
+      api.get('/api/whatsapp/bridge/status', { timeout: 4000 })
+        .then(r => {
+          const { authenticated, ready, hasQr } = r.data;
+          if (ready) {
+            setBridgeStatus('ready');
+            fetchChats();
+          } else if (hasQr) {
+            setBridgeStatus('qr');
+            api.get('/api/whatsapp/bridge/qr', { responseType: 'blob' })
+               .then(qr => setQrDataUrl(URL.createObjectURL(qr)))
+               .catch(() => {});
+          } else if (authenticated) {
+            setBridgeStatus('loading');
+          } else {
+            setBridgeStatus('qr');
+          }
+        })
+        .catch(() => setBridgeStatus('offline'));
+    });
+    
+    socket.on('state', (state) => {
+      console.log('[WA] Bridge state received:', state);
+      if (state.qr) setQrDataUrl(state.qr);
+      if (state.hasQr) setBridgeStatus('qr');
+      if (state.connected) {
+          setBridgeStatus('ready');
+          setQrDataUrl(null);
+          fetchChats();
+      }
     });
 
     socket.on('disconnect', () => {
@@ -444,15 +494,7 @@ const WhatsApp = () => {
 
     socket.on('connect_error', (err) => {
       console.warn('[WA] Socket.io connect error:', err.message);
-      api.get('/api/whatsapp/bridge/status', { timeout: 4000 })
-        .then(r => {
-          const { authenticated, ready, hasQr } = r.data;
-          if      (ready)         setBridgeStatus('ready');
-          else if (hasQr)         setBridgeStatus('qr');
-          else if (authenticated) setBridgeStatus('loading');
-          else                    setBridgeStatus('qr');
-        })
-        .catch(() => setBridgeStatus('offline'));
+      setBridgeStatus('offline');
     });
 
     socket.on('qr', ({ qr }) => {
@@ -503,18 +545,40 @@ const WhatsApp = () => {
   }, [fetchChats, fetchMessages]);
 
 
+  // Auto-recovery check: if bridge is ready but we have no chats after 15s, it's stale
   useEffect(() => {
-    fetchChats();
-    const t = setInterval(fetchChats, 10000);
-    return () => clearInterval(t);
-  }, [fetchChats]);
+      if (bridgeStatus === 'ready' && !loading && !staleCheckDone) {
+          const timer = setTimeout(() => {
+              if (chatsRef.current.length === 0) {
+                  console.warn('[WA] Bridge is ready but no chats loaded after 15s. Session might be stale.');
+                  // We show the empty state with a reconnect button
+              }
+              setStaleCheckDone(true);
+          }, 15000);
+          return () => clearTimeout(timer);
+      }
+  }, [bridgeStatus, loading, staleCheckDone]);
 
   useEffect(() => {
-    if (!selected) { setMessages([]); return; }
-    fetchMessages(selected.chatId);
-    const t = setInterval(() => fetchMessages(selected.chatId), 8000);
-    return () => clearInterval(t);
-  }, [selected, fetchMessages]);
+    if (bridgeStatus === 'ready') {
+      fetchChats();
+      const t = setInterval(fetchChats, 10000);
+      return () => clearInterval(t);
+    } else {
+      setChats([]);
+      setHistorySync(null);
+    }
+  }, [fetchChats, bridgeStatus]);
+
+  useEffect(() => {
+    if (bridgeStatus === 'ready' && selected) {
+      fetchMessages(selected.chatId);
+      const t = setInterval(() => fetchMessages(selected.chatId), 8000);
+      return () => clearInterval(t);
+    } else {
+      setMessages([]);
+    }
+  }, [selected, fetchMessages, bridgeStatus]);
 
   const msgRetryRef = useRef(null);
   useEffect(() => {
@@ -537,6 +601,18 @@ const WhatsApp = () => {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Click-outside handler for the menu
+  useEffect(() => {
+      const handleClickOutside = (event) => {
+          if (menuRef.current && !menuRef.current.contains(event.target)) {
+              setShowMenu(false);
+          }
+      };
+      if (showMenu) document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
+
 
   const visibleChats = useMemo(() => chats.filter(c => {
     const match = (c.name || '').toLowerCase().includes(search.toLowerCase());
@@ -574,25 +650,41 @@ const WhatsApp = () => {
     try {
       setResetting(true);
       setShowMenu(false);
-      await api.post(`${BRIDGE_WS_URL}/logout`);
+      await api.post('/api/whatsapp/bridge/logout');
       window.location.reload();
     } catch (e) { console.error('Logout failed', e); setResetting(false); }
   };
 
   const handleReset = async () => {
-    if (!window.confirm('☢️ HARD RESET: This will wipe all session data and force a new QR scan from scratch. Continue?')) return;
+    if (!window.confirm('☢️ NUCLEAR RESET: This will completely wipe all sessions, chats, and messages from this local instance. You will need to scan the QR code again. Proceed?')) return;
     try {
       setResetting(true);
       setShowMenu(false);
       
-      // Immediately clear local state to prevent showing stale UI during transit
+      // 1. Wipe browser-level caches immediately
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Attempt to clear IndexedDB (generic approach)
+      try {
+        const databases = await window.indexedDB.databases();
+        databases.forEach(db => window.indexedDB.deleteDatabase(db.name));
+      } catch (e) { console.warn('IDB clear failed', e); }
+
+      // 2. Clear local React state
       setChats([]);
       setMessages([]);
       setSelected(null);
+      setHistorySync(null);
+      setBridgeStatus('loading');
       
-      await api.post(`${BRIDGE_WS_URL}/reset`);
-      // Wait for bridge/backend to reboot and settle
-      setTimeout(() => window.location.reload(), 2500);
+      // 3. Trigger backend/bridge nuclear wipe
+      await api.post('/api/whatsapp/bridge/reset');
+      
+      // 4. Wait and reload
+      setTimeout(() => {
+        window.location.href = '/whatsapp'; // Force hard reload to base URL
+      }, 3000);
     } catch (e) { 
       console.error('Reset failed', e); 
       setResetting(false); 
@@ -600,12 +692,31 @@ const WhatsApp = () => {
     }
   };
 
+  // Only show overlay if we know we are disconnected or resetting. 
+  // If bridge is 'ready' but chats are empty, it's just loading from DB.
   const showOverlay =
     bridgeStatus === 'qr'     ||
     bridgeStatus === 'offline' ||
-    resetting ||
-    (bridgeStatus === 'loading' && chats.length === 0);
+    resetting;
 
+
+  if (showOverlay) {
+    return (
+      <BridgeOverlay
+        status={resetting ? 'loading' : bridgeStatus}
+        qrUrl={qrDataUrl}
+        onRetry={() => {
+          setBridgeStatus('loading');
+          api.get('/api/whatsapp/bridge/status').then(r => {
+            const { ready, hasQr } = r.data;
+            if (ready) setBridgeStatus('ready');
+            else if (hasQr) setBridgeStatus('qr');
+            else setBridgeStatus('offline');
+          }).catch(() => setBridgeStatus('offline'));
+        }}
+      />
+    );
+  }
 
   return (
     <div style={{
@@ -613,21 +724,6 @@ const WhatsApp = () => {
       background: C.bg, fontFamily: "'Segoe UI', Helvetica, Arial, sans-serif",
       position: 'relative',
     }}>
-      {showOverlay && (
-        <BridgeOverlay
-          status={resetting ? 'loading' : bridgeStatus}
-          qrUrl={qrDataUrl}
-          onRetry={() => {
-            setBridgeStatus('loading');
-            api.get('/api/whatsapp/bridge/status').then(r => {
-              const { authenticated, ready, hasQr } = r.data;
-              if (ready) setBridgeStatus('ready');
-              else if (hasQr) setBridgeStatus('qr');
-              else setBridgeStatus('offline');
-            }).catch(() => setBridgeStatus('offline'));
-          }}
-        />
-      )}
 
       <div style={{
         width: 56, background: C.panel, display: 'flex', flexDirection: 'column',
@@ -667,10 +763,21 @@ const WhatsApp = () => {
       }}>
         <div style={{ height: 59, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', background: C.header, flexShrink: 0, borderBottom: `1px solid ${C.divider}` }}>
           <span style={{ fontSize: 22, fontWeight: 700, color: C.textPri, paddingLeft: 4, letterSpacing: '-0.5px' }}>WhatsApp</span>
-          <div style={{ display: 'flex', gap: 10, position: 'relative' }}>
-            {[CircleDot, Users, Megaphone, MessageSquare].map((Icon, i) => (
-              <IconBtn key={i} icon={<Icon size={20} color={C.textSec} />} />
-            ))}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', position: 'relative' }} ref={menuRef}>
+            <button 
+                onClick={handleReset}
+                style={{ 
+                    background: '#d32f2f', border: 'none', 
+                    color: '#fff', fontSize: 11, fontWeight: 800, padding: '6px 12px', 
+                    borderRadius: 4, cursor: 'pointer', marginRight: 8,
+                    boxShadow: '0 2px 4px rgba(0,0,0,.3)',
+                    textTransform: 'uppercase', letterSpacing: '0.5px'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f44336'}
+                onMouseLeave={e => e.currentTarget.style.background = '#d32f2f'}
+            >
+                RESET SESSION
+            </button>
             <IconBtn 
                icon={<MoreVertical size={20} color={C.textSec} />} 
                onClick={() => setShowMenu(!showMenu)}
@@ -678,16 +785,16 @@ const WhatsApp = () => {
             {showMenu && (
               <div 
                 style={{
-                  position: 'absolute', top: 40, right: 0, 
+                  position: 'absolute', top: 36, right: 0, 
                   background: C.header, borderRadius: 3, 
-                  boxShadow: '0 4px 12px rgba(0,0,0,.3)', 
-                  zIndex: 100, width: 180, padding: '8px 0'
+                  boxShadow: '0 4px 12px rgba(0,0,0,.5)', 
+                  zIndex: 100, width: 190, padding: '9px 0',
+                  border: `1px solid ${C.divider}`
                 }}
-                onMouseLeave={() => setShowMenu(false)}
               >
                 <div 
                   onClick={handleLogout}
-                  style={{ padding: '10px 24px', color: C.textPri, fontSize: 14, cursor: 'pointer' }}
+                  style={{ padding: '10px 24px', color: C.textPri, fontSize: 14.5, cursor: 'pointer' }}
                   onMouseEnter={e => e.currentTarget.style.background = C.hover}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
@@ -695,7 +802,7 @@ const WhatsApp = () => {
                 </div>
                 <div 
                   onClick={handleReset}
-                  style={{ padding: '10px 24px', color: '#ffb300', fontSize: 14, cursor: 'pointer', borderTop: `1px solid ${C.divider}` }}
+                  style={{ padding: '10px 24px', color: '#ffb300', fontSize: 14.5, cursor: 'pointer', borderTop: `1px solid ${C.divider}` }}
                   onMouseEnter={e => e.currentTarget.style.background = C.hover}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
@@ -754,7 +861,17 @@ const WhatsApp = () => {
               <Loader2 size={22} color={C.green} style={{ animation: 'spin 1s linear infinite' }} />
             </div>
           )}
-          {!loading && visibleChats.length === 0 && (
+          {!loading && chats.length === 0 && staleCheckDone && bridgeStatus === 'ready' && (
+             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 32, gap: 16 }}>
+                 <p style={{ textAlign: 'center', color: C.textSec, fontSize: 14 }}>
+                     Session appears stale or broken.
+                 </p>
+                 <button onClick={handleReset} style={{ background: C.green, border: 'none', color: '#111b21', padding: '9px 26px', borderRadius: 20, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                     Start New Link
+                 </button>
+             </div>
+          )}
+          {!loading && visibleChats.length === 0 && (!staleCheckDone || chats.length > 0) && (
             <p style={{ textAlign: 'center', color: C.textSec, fontSize: 14, padding: 32 }}>
               {search ? 'No chats match your search' : 'No conversations yet'}
             </p>
@@ -770,12 +887,16 @@ const WhatsApp = () => {
         </div>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: C.bg, position: 'relative', overflow: 'hidden', minWidth: 0 }}>
-        {/* Wallpaper */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: C.bg, position: 'relative', overflow: 'hidden', minWidth: 0 }} className="chat-background">
+        {/* Doodle Wallpaper */}
         <div style={{
-          position: "absolute", inset: 0, opacity: .12, pointerEvents: "none",
-          backgroundImage: "url('https://w0.peakpx.com/wallpaper/818/148/HD-whatsapp-dark-background-whatsapp-doodle-patterns-thumbnail.jpg')",
-          backgroundSize: "460px", backgroundRepeat: "repeat",
+            position: "absolute",
+            inset: 0,
+            opacity: 0.1,
+            pointerEvents: "none",
+            backgroundImage: "url('/bg-chat-tile-dark.png')",
+            backgroundSize: "500px",
+            backgroundRepeat: "repeat"
         }} />
 
         {selected ? (
@@ -822,17 +943,17 @@ const WhatsApp = () => {
             </div>
 
             {/* Message input */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px', background: C.header, borderTop: `1px solid ${C.divider}`, flexShrink: 0, zIndex: 10, position: 'relative' }}>
-              <IconBtn icon={<Smile size={24} />} />
-              <IconBtn icon={<Paperclip size={24} style={{ transform: 'rotate(-45deg)' }} />} />
-              <div style={{ flex: 1, background: C.inputBg, borderRadius: 9, padding: '0 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: C.header, flexShrink: 0, zIndex: 10, position: 'relative' }}>
+              <IconBtn icon={<Plus size={26} />} />
+              <div style={{ flex: 1, background: C.inputBg, borderRadius: 8, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <IconBtn icon={<Smile size={24} />} style={{ padding: 4 }} />
                 <input
                   value={newMsg}
                   onChange={e => setNewMsg(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
                   placeholder="Type a message"
                   disabled={sending}
-                  style={{ background: 'none', border: 'none', outline: 'none', width: '100%', fontSize: 15, color: C.textPri, padding: '10px 0' }}
+                  style={{ background: 'none', border: 'none', outline: 'none', flex: 1, fontSize: 15, color: C.textPri, padding: '10px 0' }}
                 />
               </div>
               <IconBtn
@@ -868,6 +989,10 @@ const WhatsApp = () => {
         * { scrollbar-width: thin; scrollbar-color: #374045 transparent; }
         *::-webkit-scrollbar { width: 5px; }
         *::-webkit-scrollbar-thumb { background: #374045; border-radius: 3px; }
+        
+        .chat-background {
+             background-color: #0b141a;
+        }
       `}</style>
     </div>
   );
