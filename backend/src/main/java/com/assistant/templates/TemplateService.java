@@ -35,6 +35,7 @@ public class TemplateService {
         existing.setTitle(updatedData.getTitle());
         existing.setContent(updatedData.getContent());
         existing.setCategory(updatedData.getCategory());
+        existing.setFromEmail(updatedData.getFromEmail());
         existing.setTargetEmail(updatedData.getTargetEmail());
         existing.setSendAt(updatedData.getSendAt());
         if (updatedData.getStatus() != null) {

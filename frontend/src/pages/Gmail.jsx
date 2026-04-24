@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Mail, Edit3, Search, RefreshCw, X } from 'lucide-react';
+import { Mail, Edit3, Search, RefreshCw, X, Send } from 'lucide-react';
 import { api } from '../api/axios';
 
 const Gmail = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isComposing, setIsComposing] = useState(false);
-  const [draft, setDraft] = useState({ to: '', subject: '', body: '' });
+  const [draft, setDraft] = useState({ from: 'chema@chemacabeza.dev', to: '', subject: '', body: '' });
 
   // Fetch emails
   const { data: messages, isLoading, refetch } = useQuery({
@@ -40,8 +40,9 @@ const Gmail = () => {
 
   const sendEmail = useMutation({
     mutationFn: async (payload) => {
-      // Create raw RFC 2822 payload (simplified ASCII fallback here, usually base64url encoded)
+      const fromHeader = payload.from ? `From: ${payload.from}\r\n` : '';
       const raw = btoa(
+        fromHeader +
         `To: ${payload.to}\r\n` +
         `Subject: ${payload.subject}\r\n\r\n` +
         `${payload.body}`
@@ -51,9 +52,9 @@ const Gmail = () => {
     },
     onSuccess: () => {
       setIsComposing(false);
-      setDraft({ to: '', subject: '', body: '' });
+      setDraft({ from: 'chema@chemacabeza.dev', to: '', subject: '', body: '' });
       alert("Email sent successfully!");
-    }
+    },
   });
 
   const handleSend = (e) => {
@@ -72,10 +73,10 @@ const Gmail = () => {
     <div className="h-full flex flex-col bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       
       {/* Header Panel */}
-      <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+      <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-red-500">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <Mail className="text-blue-600" /> Gmail Integration
+            <Mail className="text-blue-600" /> Gmail Integration (Updated)
           </h1>
           <p className="text-sm text-gray-500 mt-1">Manage and draft your emails.</p>
         </div>
@@ -150,12 +151,26 @@ const Gmail = () => {
                <button onClick={() => setIsComposing(false)} className="text-gray-400 hover:text-gray-700"><X size={20} /></button>
              </div>
              <form onSubmit={handleSend} className="flex flex-col flex-1 overflow-hidden">
-                <div className="px-6 border-b border-gray-100">
+                <div className="px-6 border-b border-gray-100 flex items-center bg-yellow-50">
+                   <label className="text-xs font-bold text-red-600 w-24">FROM EMAIL</label>
+                   <select 
+                      className="flex-1 py-3 outline-none text-sm bg-transparent"
+                      value={draft.from}
+                      onChange={e => setDraft({...draft, from: e.target.value})}
+                   >
+                      <option value="chema@chemacabeza.dev">chema@chemacabeza.dev</option>
+                      <option value="the.engineering.corner.314@gmail.com">the.engineering.corner.314@gmail.com</option>
+                      <option value="raymondreddington600@gmail.com">raymondreddington600@gmail.com</option>
+                      <option value="chemacabeza@gmail.com">chemacabeza@gmail.com</option>
+                   </select>
+                </div>
+                <div className="px-6 border-b border-gray-100 flex items-center">
+                   <label className="text-xs font-semibold text-gray-400 w-12">To</label>
                    <input 
                       required 
                       type="email" 
-                      placeholder="To" 
-                      className="w-full py-3 outline-none text-sm" 
+                      placeholder="Recipient" 
+                      className="flex-1 py-3 outline-none text-sm" 
                       value={draft.to} 
                       onChange={e => setDraft({...draft, to: e.target.value})}
                    />

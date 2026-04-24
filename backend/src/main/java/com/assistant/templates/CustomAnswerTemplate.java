@@ -29,6 +29,7 @@ public class CustomAnswerTemplate {
 
     private String category;
 
+    private String fromEmail;
     private String targetEmail;
     private LocalDateTime sendAt;
     
@@ -66,6 +67,9 @@ public class CustomAnswerTemplate {
 
     public String getTargetEmail() { return targetEmail; }
     public void setTargetEmail(String targetEmail) { this.targetEmail = targetEmail; }
+
+    public String getFromEmail() { return fromEmail; }
+    public void setFromEmail(String fromEmail) { this.fromEmail = fromEmail; }
 
     public LocalDateTime getSendAt() { return sendAt; }
     public void setSendAt(LocalDateTime sendAt) { this.sendAt = sendAt; }

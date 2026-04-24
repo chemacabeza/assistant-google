@@ -66,7 +66,10 @@ public class ScheduledEmailDispatcher {
                 String accessToken = authorizedClient.getAccessToken().getTokenValue();
 
                 // Construct raw email RFC 2822 payload
-                String rawEmail = "To: " + task.getTargetEmail() + "\r\n" +
+                String fromHeader = (task.getFromEmail() != null && !task.getFromEmail().isEmpty()) 
+                                    ? "From: " + task.getFromEmail() + "\r\n" : "";
+                String rawEmail = fromHeader + 
+                                  "To: " + task.getTargetEmail() + "\r\n" +
                                   "Subject: " + task.getTitle() + "\r\n\r\n" +
                                   task.getContent();
                 

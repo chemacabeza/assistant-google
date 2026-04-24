@@ -7,7 +7,7 @@ const Templates = () => {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showContactsDropdown, setShowContactsDropdown] = useState(false);
-  const [modalData, setModalData] = useState({ id: null, title: '', content: '', category: 'General', targetEmail: '', sendDate: '', sendTime: '' });
+  const [modalData, setModalData] = useState({ id: null, title: '', content: '', category: 'General', targetEmail: '', fromEmail: 'chema@chemacabeza.dev', sendDate: '', sendTime: '' });
 
   const { data: templates, isLoading } = useQuery({
     queryKey: ['templates'],
@@ -49,7 +49,7 @@ const Templates = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['templates'] })
   });
 
-  const openModal = (temp = { id: null, title: '', content: '', category: 'General', targetEmail: '', sendDate: '', sendTime: '' }) => {
+  const openModal = (temp = { id: null, title: '', content: '', category: 'General', targetEmail: '', fromEmail: 'chema@chemacabeza.dev', sendDate: '', sendTime: '' }) => {
     if (temp.sendAt) {
         temp.sendDate = temp.sendAt.split('T')[0];
         temp.sendTime = temp.sendAt.split('T')[1].substring(0, 5);
@@ -103,6 +103,7 @@ const Templates = () => {
                        {temp.status === 'SENT' ? 'Sent' : temp.status === 'FAILED' ? 'Failed' : 'Pending'}
                     </span>
                   </div>
+                  {temp.fromEmail && <p className="text-xs font-semibold mb-1 text-gray-500">From: {temp.fromEmail}</p>}
                   {temp.targetEmail && <p className="text-xs font-semibold mb-2 text-gray-600">To: {temp.targetEmail}</p>}
                   {temp.sendAt && <p className="text-xs font-semibold mb-3 text-indigo-600">Scheduled: {new Date(temp.sendAt).toLocaleString()}</p>}
                   <p className="text-sm text-gray-600 line-clamp-4 leading-relaxed bg-gray-50 p-3 rounded" style={{ whiteSpace: 'pre-line' }}>{temp.content}</p>
@@ -131,43 +132,59 @@ const Templates = () => {
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Title</label>
                   <input required type="text" placeholder="e.g., Follow up after meeting" className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none" value={modalData.title} onChange={e => setModalData({...modalData, title: e.target.value})} />
                 </div>
-                <div className="relative">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Target Email</label>
-                  <input 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">From Email</label>
+                    <select 
                       required 
-                      type="text" 
-                      placeholder="recipient@example.com" 
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none" 
-                      value={modalData.targetEmail} 
-                      onChange={e => {
-                         setModalData({...modalData, targetEmail: e.target.value});
-                         setShowContactsDropdown(true);
-                      }}
-                      onFocus={() => setShowContactsDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowContactsDropdown(false), 200)}
-                  />
-                  {showContactsDropdown && contacts && contacts.length > 0 && modalData.targetEmail.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                        {contacts
-                          .filter(c => 
-                             c.name?.toLowerCase().includes(modalData.targetEmail.toLowerCase()) || 
-                             c.email.toLowerCase().includes(modalData.targetEmail.toLowerCase())
-                          )
-                          .map((contact, idx) => (
-                          <div 
-                            key={idx} 
-                            className="px-4 py-2 hover:bg-emerald-50 cursor-pointer border-b border-gray-50 last:border-0"
-                            onClick={() => {
-                               setModalData({...modalData, targetEmail: contact.email});
-                               setShowContactsDropdown(false);
-                            }}
-                          >
-                            <p className="font-semibold text-gray-800 text-sm">{contact.name || 'Unknown'}</p>
-                            <p className="text-xs text-gray-500">{contact.email}</p>
-                          </div>
-                        ))}
-                      </div>
-                  )}
+                      value={modalData.fromEmail || 'chema@chemacabeza.dev'} 
+                      onChange={e => setModalData({...modalData, fromEmail: e.target.value})}
+                    >
+                      <option value="chema@chemacabeza.dev">chema@chemacabeza.dev</option>
+                      <option value="the.engineering.corner.314@gmail.com">the.engineering.corner.314@gmail.com</option>
+                      <option value="raymondreddington600@gmail.com">raymondreddington600@gmail.com</option>
+                      <option value="chemacabeza@gmail.com">chemacabeza@gmail.com</option>
+                    </select>
+                  </div>
+                  <div className="relative">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Target Email</label>
+                    <input 
+                        required 
+                        type="text" 
+                        placeholder="recipient@example.com" 
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none" 
+                        value={modalData.targetEmail} 
+                        onChange={e => {
+                           setModalData({...modalData, targetEmail: e.target.value});
+                           setShowContactsDropdown(true);
+                        }}
+                        onFocus={() => setShowContactsDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowContactsDropdown(false), 200)}
+                    />
+                    {showContactsDropdown && contacts && contacts.length > 0 && modalData.targetEmail.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                          {contacts
+                            .filter(c => 
+                               c.name?.toLowerCase().includes(modalData.targetEmail.toLowerCase()) || 
+                               c.email.toLowerCase().includes(modalData.targetEmail.toLowerCase())
+                            )
+                            .map((contact, idx) => (
+                            <div 
+                              key={idx} 
+                              className="px-4 py-2 hover:bg-emerald-50 cursor-pointer border-b border-gray-50 last:border-0"
+                              onClick={() => {
+                                 setModalData({...modalData, targetEmail: contact.email});
+                                 setShowContactsDropdown(false);
+                              }}
+                            >
+                              <p className="font-semibold text-gray-800 text-sm">{contact.name || 'Unknown'}</p>
+                              <p className="text-xs text-gray-500">{contact.email}</p>
+                            </div>
+                          ))}
+                        </div>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
