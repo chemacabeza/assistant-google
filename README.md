@@ -21,7 +21,13 @@ This application integrates with the following external services. You must creat
 | :--- | :--- | :--- |
 | **Gmail API** | Read inbox and send emails | [Enable Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com) |
 | **Google Calendar API** | Read and create calendar events | [Enable Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com) |
-| **Google Maps API** | Geocoding and places lookup | [Enable Maps API](https://console.cloud.google.com/apis/library/maps-backend.googleapis.com) |
+| **Google People API** | Access Google Contacts to resolve names to emails | [Enable People API](https://console.cloud.google.com/apis/library/people.googleapis.com) |
+| **Google Drive API** | Access and manage files in Google Drive | [Enable Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com) |
+| **Google Drive Activity API** | Track changes and activity in Google Drive | [Enable Drive Activity API](https://console.cloud.google.com/apis/library/driveactivity.googleapis.com) |
+| **Google Drive Labels API** | Manage file metadata and labels in Drive | [Enable Drive Labels API](https://console.cloud.google.com/apis/library/drivelabels.googleapis.com) |
+| **Maps JavaScript API** | Render interactive maps in the browser | [Enable Maps API](https://console.cloud.google.com/apis/library/maps-backend.googleapis.com) |
+| **Maps Directions API** | Calculate driving routes and durations | [Enable Directions API](https://console.cloud.google.com/apis/library/directions-backend.googleapis.com) |
+| **Places API** | Autocomplete and place search functionality | [Enable Places API](https://console.cloud.google.com/apis/library/places-backend.googleapis.com) |
 | **Google OAuth 2.0** | User authentication and authorization | [OAuth Credentials](https://console.cloud.google.com/apis/credentials) |
 | **OpenAI API** | AI assistant intent parsing and responses | [Get API Key](https://platform.openai.com/api-keys) |
 
@@ -56,7 +62,7 @@ The application requires a secure OAuth 2.0 Web Client integrated with your Goog
 
 1.  Navigate to the [Google Cloud Console](https://console.cloud.google.com/).
 2.  Create a **New Project** (e.g., "Antigravity Assistant").
-3.  Go to **APIs & Services > Library** and enable **both** the `Gmail API` and the `Google Calendar API`.
+3.  Go to **APIs & Services > Library** and enable **all** the required Google APIs listed in the table above.
 4.  Go to **APIs & Services > OAuth consent screen**:
     *   Choose **External** (unless you possess a Google Workspace organization, then Internal is fine).
     *   Fill in the mandatory app name and support email.
@@ -67,6 +73,11 @@ The application requires a secure OAuth 2.0 Web Client integrated with your Goog
         *   `https://www.googleapis.com/auth/gmail.readonly`
         *   `https://www.googleapis.com/auth/gmail.send`
         *   `https://www.googleapis.com/auth/calendar`
+        *   `https://www.googleapis.com/auth/contacts.readonly`
+        *   `https://www.googleapis.com/auth/contacts.other.readonly`
+        *   `https://www.googleapis.com/auth/drive`
+        *   `https://www.googleapis.com/auth/drive.activity.readonly`
+        *   `https://www.googleapis.com/auth/drive.labels.readonly`
     *   Add your own email (e.g., `test@gmail.com`) as a **Test User** since the app will be in "Testing" mode to circumvent Google's rigorous app verification process.
 5.  Go to **APIs & Services > Credentials**:
     *   Click `Create Credentials > OAuth client ID`.
