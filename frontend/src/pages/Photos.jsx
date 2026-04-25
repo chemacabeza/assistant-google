@@ -25,13 +25,24 @@ const Photos = () => {
     }
   }, [accountsData, selectedEmail]);
 
-  const { data: mediaItems, isLoading } = useQuery({
+  const { data: mediaItems, isLoading, isError, error } = useQuery({
     queryKey: ['photos_media', selectedEmail],
     queryFn: async () => {
       const res = await api.get('/api/photos/media', { params: { pageSize: 50 } });
       return res.data?.mediaItems || [];
-    }
+    },
+    retry: false
   });
+
+  const handleLogout = async () => {
+    try {
+      await api.post('/api/auth/logout');
+      window.location.href = '/login';
+    } catch (e) {
+      console.error('Logout failed', e);
+      window.location.href = '/login';
+    }
+  };
 
   return (
     <div className="flex h-screen w-screen bg-[#1f1f1f] text-[#e3e3e3] font-sans overflow-hidden">
@@ -134,8 +145,20 @@ const Photos = () => {
                <div className="flex justify-center p-12">
                  <div className="animate-spin w-8 h-8 border-4 border-[#c2e7ff] border-t-transparent rounded-full"></div>
                </div>
+            ) : isError ? (
+               <div className="text-center p-12 text-[#ff8a8a] bg-[#28292a] rounded-xl border border-[#444746] m-4">
+                 <p className="font-semibold text-lg mb-2">Authorization Error</p>
+                 <p className="text-[#e3e3e3] mb-4">The Google Photos API rejected the request. You likely need to re-authenticate to grant the new permissions.</p>
+                 <p className="text-sm text-[#c4c7c5] mb-6">Error details: {error?.response?.data?.message || error?.message || 'Unknown error'}</p>
+                 <button onClick={handleLogout} className="bg-[#c2e7ff] text-[#001d35] px-6 py-2 rounded-full font-medium hover:bg-[#b0dcf8] transition-colors">
+                   Log Out & Re-Authenticate
+                 </button>
+               </div>
             ) : (!mediaItems || mediaItems.length === 0) ? (
-               <div className="text-center p-12 text-[#c4c7c5]">No photos found.</div>
+               <div className="text-center p-12 text-[#c4c7c5]">
+                  <p className="font-medium text-lg text-white mb-2">No photos found.</p>
+                  <p className="text-sm">If you just authorized the app, ensure you explicitly checked the Google Photos permissions box during login.</p>
+               </div>
             ) : (
                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                  {mediaItems.map((item) => (

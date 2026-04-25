@@ -16,6 +16,8 @@ public class PhotosController {
     @GetMapping("/media")
     public ResponseEntity<Object> listMediaItems(
             @RequestParam(defaultValue = "50") int pageSize) {
-        return ResponseEntity.ok(photosService.listMediaItems(pageSize));
+        Object response = photosService.listMediaItems(pageSize);
+        System.out.println("Google Photos API Response: " + response);
+        return ResponseEntity.ok(response);
     }
 }
