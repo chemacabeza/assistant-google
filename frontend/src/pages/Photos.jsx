@@ -37,10 +37,11 @@ const Photos = () => {
   const handleLogout = async () => {
     try {
       await api.post('/api/auth/logout');
-      window.location.href = '/login';
+      // Jump directly to the OAuth provider to bypass the intermediary login screen
+      window.location.href = '/oauth2/authorization/google';
     } catch (e) {
       console.error('Logout failed', e);
-      window.location.href = '/login';
+      window.location.href = '/oauth2/authorization/google';
     }
   };
 
