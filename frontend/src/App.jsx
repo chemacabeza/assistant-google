@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Assistant from './pages/Assistant';
 import Gmail from './pages/Gmail';
+import Drive from './pages/Drive';
 import Calendar from './pages/Calendar';
 import Templates from './pages/Templates';
 import Maps from './pages/Maps';
@@ -32,6 +33,11 @@ function App() {
             <Route path="/whatsapp" element={
               <div style={{ width:'100vw', height:'100vh', overflow:'hidden' }}>
                 <WhatsApp />
+              </div>
+            } />
+            <Route path="/drive" element={
+              <div style={{ width:'100vw', height:'100vh', overflow:'hidden', backgroundColor: '#131314', color: '#e3e3e3', fontFamily: 'Inter, Roboto, sans-serif' }}>
+                <Drive />
               </div>
             } />
           </Route>

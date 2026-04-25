@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Save, ExternalLink, Key, ToggleLeft, ToggleRight, Type, Shield, Map, Brain, Mail, Calendar, Users, MessageSquare, Loader2 } from 'lucide-react';
 import { api } from '../api/axios';
+import LinkedAccountsManager from '../components/LinkedAccountsManager';
 
 const UI_STORAGE_KEY = 'assistant_ui_config';
 
@@ -254,6 +255,9 @@ const Configuration = () => {
 
         </div>
       </div>
+
+      {/* Linked Email Accounts Section */}
+      <LinkedAccountsManager />
 
       {/* API Keys Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">

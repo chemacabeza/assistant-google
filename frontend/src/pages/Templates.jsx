@@ -7,7 +7,15 @@ const Templates = () => {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showContactsDropdown, setShowContactsDropdown] = useState(false);
-  const [modalData, setModalData] = useState({ id: null, title: '', content: '', category: 'General', targetEmail: '', fromEmail: 'chema@chemacabeza.dev', sendDate: '', sendTime: '' });
+  const [modalData, setModalData] = useState({ id: null, title: '', content: '', category: 'General', targetEmail: '', fromEmail: '', sendDate: '', sendTime: '' });
+
+  const { data: accountsData } = useQuery({
+    queryKey: ['linked_accounts'],
+    queryFn: async () => {
+      const res = await api.get('/api/accounts');
+      return res.data || [];
+    }
+  });
 
   const { data: templates, isLoading } = useQuery({
     queryKey: ['templates'],
@@ -49,7 +57,10 @@ const Templates = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['templates'] })
   });
 
-  const openModal = (temp = { id: null, title: '', content: '', category: 'General', targetEmail: '', fromEmail: 'chema@chemacabeza.dev', sendDate: '', sendTime: '' }) => {
+  const openModal = (temp = { id: null, title: '', content: '', category: 'General', targetEmail: '', fromEmail: '', sendDate: '', sendTime: '' }) => {
+    if (!temp.fromEmail && accountsData?.length > 0) {
+        temp.fromEmail = accountsData[0].email;
+    }
     if (temp.sendAt) {
         temp.sendDate = temp.sendAt.split('T')[0];
         temp.sendTime = temp.sendAt.split('T')[1].substring(0, 5);
@@ -138,13 +149,16 @@ const Templates = () => {
                     <select 
                       required 
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none" 
-                      value={modalData.fromEmail || 'chema@chemacabeza.dev'} 
+                      value={modalData.fromEmail} 
                       onChange={e => setModalData({...modalData, fromEmail: e.target.value})}
                     >
-                      <option value="chema@chemacabeza.dev">chema@chemacabeza.dev</option>
-                      <option value="the.engineering.corner.314@gmail.com">the.engineering.corner.314@gmail.com</option>
-                      <option value="raymondreddington600@gmail.com">raymondreddington600@gmail.com</option>
-                      <option value="chemacabeza@gmail.com">chemacabeza@gmail.com</option>
+                      {accountsData?.length > 0 ? (
+                        accountsData.map(acc => (
+                          <option key={acc.id} value={acc.email}>{acc.email}</option>
+                        ))
+                      ) : (
+                        <option value="chema@chemacabeza.dev">chema@chemacabeza.dev</option>
+                      )}
                     </select>
                   </div>
                   <div className="relative">

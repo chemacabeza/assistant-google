@@ -7,7 +7,21 @@ const Gmail = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isComposing, setIsComposing] = useState(false);
-  const [draft, setDraft] = useState({ from: 'chema@chemacabeza.dev', to: '', subject: '', body: '' });
+  const [draft, setDraft] = useState({ from: '', to: '', subject: '', body: '' });
+
+  const { data: accountsData } = useQuery({
+    queryKey: ['linked_accounts'],
+    queryFn: async () => {
+      const res = await api.get('/api/accounts');
+      return res.data || [];
+    }
+  });
+
+  React.useEffect(() => {
+    if (accountsData?.length > 0 && !draft.from) {
+      setDraft(prev => ({ ...prev, from: accountsData[0].email }));
+    }
+  }, [accountsData, draft.from]);
 
   // Fetch emails
   const { data: messages, isLoading, refetch } = useQuery({
@@ -52,7 +66,7 @@ const Gmail = () => {
     },
     onSuccess: () => {
       setIsComposing(false);
-      setDraft({ from: 'chema@chemacabeza.dev', to: '', subject: '', body: '' });
+      setDraft(prev => ({ ...prev, to: '', subject: '', body: '' }));
       alert("Email sent successfully!");
     },
   });
@@ -158,10 +172,13 @@ const Gmail = () => {
                       value={draft.from}
                       onChange={e => setDraft({...draft, from: e.target.value})}
                    >
-                      <option value="chema@chemacabeza.dev">chema@chemacabeza.dev</option>
-                      <option value="the.engineering.corner.314@gmail.com">the.engineering.corner.314@gmail.com</option>
-                      <option value="raymondreddington600@gmail.com">raymondreddington600@gmail.com</option>
-                      <option value="chemacabeza@gmail.com">chemacabeza@gmail.com</option>
+                     {accountsData?.length > 0 ? (
+                       accountsData.map(acc => (
+                         <option key={acc.id} value={acc.email}>{acc.email}</option>
+                       ))
+                     ) : (
+                       <option value="chema@chemacabeza.dev">chema@chemacabeza.dev</option>
+                     )}
                    </select>
                 </div>
                 <div className="px-6 border-b border-gray-100 flex items-center">
