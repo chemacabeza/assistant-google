@@ -13,11 +13,20 @@ public class PhotosController {
         this.photosService = photosService;
     }
 
+    @PostMapping("/session")
+    public ResponseEntity<Object> createSession() {
+        return ResponseEntity.ok(photosService.createPickerSession());
+    }
+
+    @GetMapping("/session/{sessionId}")
+    public ResponseEntity<Object> getSessionStatus(@PathVariable String sessionId) {
+        return ResponseEntity.ok(photosService.getSessionStatus(sessionId));
+    }
+
     @GetMapping("/media")
     public ResponseEntity<Object> listMediaItems(
+            @RequestParam String sessionId,
             @RequestParam(defaultValue = "50") int pageSize) {
-        Object response = photosService.listMediaItems(pageSize);
-        System.out.println("Google Photos API Response: " + response);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(photosService.listMediaItems(sessionId, pageSize));
     }
 }
