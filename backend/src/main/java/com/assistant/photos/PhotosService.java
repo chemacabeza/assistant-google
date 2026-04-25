@@ -22,7 +22,7 @@ public class PhotosService {
     public Object createPickerSession() {
         return webClient.post()
                 .uri(PHOTOS_PICKER_URL + "/sessions")
-                .bodyValue(Map.of("pickerSession", Map.of()))
+                .bodyValue(Map.of()) // Google expects the PickingSession object directly, so an empty object is fine
                 .retrieve()
                 .bodyToMono(Object.class)
                 .block();
