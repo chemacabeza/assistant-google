@@ -40,6 +40,8 @@ spring:
               - https://www.googleapis.com/auth/drive
               - https://www.googleapis.com/auth/drive.activity.readonly
               - https://www.googleapis.com/auth/drive.labels.readonly
+              - https://www.googleapis.com/auth/photoslibrary.readonly
+              - https://www.googleapis.com/auth/photospicker.mediaitems.readonly
         provider:
           google:
             user-name-attribute: email

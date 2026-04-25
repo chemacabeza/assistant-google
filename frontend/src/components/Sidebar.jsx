@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Mail, Calendar, Settings, Bot, BookTemplate, MapPin, LayoutDashboard, Cog, MessageCircle, HardDrive } from 'lucide-react';
+import { Mail, Calendar, Settings, Bot, BookTemplate, MapPin, LayoutDashboard, Cog, MessageCircle, HardDrive, Image as ImageIcon } from 'lucide-react';
 
 const Sidebar = () => {
   const navItems = [
@@ -8,6 +8,7 @@ const Sidebar = () => {
     { name: 'Assistant', path: '/assistant', icon: <Bot size={20} /> },
     { name: 'Gmail', path: '/gmail', icon: <Mail size={20} /> },
     { name: 'Google Drive', path: '/drive', icon: <HardDrive size={20} /> },
+    { name: 'Google Photos', path: '/photos', icon: <ImageIcon size={20} /> },
     { name: 'Calendar', path: '/calendar', icon: <Calendar size={20} /> },
     { name: 'Custom Answers', path: '/templates', icon: <BookTemplate size={20} /> },
     { name: 'Maps', path: '/maps', icon: <MapPin size={20} /> },

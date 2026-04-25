@@ -25,6 +25,9 @@ This application integrates with the following external services. You must creat
 | **Google Drive API** | Access and manage files in Google Drive | [Enable Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com) |
 | **Google Drive Activity API** | Track changes and activity in Google Drive | [Enable Drive Activity API](https://console.cloud.google.com/apis/library/driveactivity.googleapis.com) |
 | **Google Drive Labels API** | Manage file metadata and labels in Drive | [Enable Drive Labels API](https://console.cloud.google.com/apis/library/drivelabels.googleapis.com) |
+| **Photos Library API** | Access and manage files in Google Photos | [Enable Photos Library API](https://console.cloud.google.com/apis/library/photoslibrary.googleapis.com) |
+| **Google Photos Picker API** | Allow users to select photos securely | [Enable Photos Picker API](https://console.cloud.google.com/apis/library/photospicker.googleapis.com) |
+| **Google Photos Ambient API** | Support for ambient photo frames | [Enable Photos Ambient API](https://console.cloud.google.com/apis/library/photosambient.googleapis.com) |
 | **Maps JavaScript API** | Render interactive maps in the browser | [Enable Maps API](https://console.cloud.google.com/apis/library/maps-backend.googleapis.com) |
 | **Maps Directions API** | Calculate driving routes and durations | [Enable Directions API](https://console.cloud.google.com/apis/library/directions-backend.googleapis.com) |
 | **Places API** | Autocomplete and place search functionality | [Enable Places API](https://console.cloud.google.com/apis/library/places-backend.googleapis.com) |
@@ -78,6 +81,8 @@ The application requires a secure OAuth 2.0 Web Client integrated with your Goog
         *   `https://www.googleapis.com/auth/drive`
         *   `https://www.googleapis.com/auth/drive.activity.readonly`
         *   `https://www.googleapis.com/auth/drive.labels.readonly`
+        *   `https://www.googleapis.com/auth/photoslibrary.readonly`
+        *   `https://www.googleapis.com/auth/photospicker.mediaitems.readonly`
     *   Add your own email (e.g., `test@gmail.com`) as a **Test User** since the app will be in "Testing" mode to circumvent Google's rigorous app verification process.
 5.  Go to **APIs & Services > Credentials**:
     *   Click `Create Credentials > OAuth client ID`.
