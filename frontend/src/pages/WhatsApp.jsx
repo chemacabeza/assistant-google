@@ -439,7 +439,7 @@ const WhatsApp = () => {
         fetchMessages(data[0].chatId);
       }
     } catch (err) { 
-      console.error('[WA] Failed to fetch chats:', err);
+      // console.error('[WA] Failed to fetch chats:', err);
       setLoading(false); 
     }
   }, [fetchMessages]);
@@ -453,7 +453,7 @@ const WhatsApp = () => {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      console.log('[WA] Socket.io connected to bridge');
+      // console.log('[WA] Socket.io connected to bridge');
       setSocketOk(true);
       // Immediately check status via REST in case we missed events
       api.get('/api/whatsapp/bridge/status', { timeout: 4000 })
@@ -477,7 +477,7 @@ const WhatsApp = () => {
     });
     
     socket.on('state', (state) => {
-      console.log('[WA] Bridge state received:', state);
+      // console.log('[WA] Bridge state received:', state);
       if (state.qr) setQrDataUrl(state.qr);
       if (state.hasQr) setBridgeStatus('qr');
       if (state.connected) {
@@ -488,36 +488,36 @@ const WhatsApp = () => {
     });
 
     socket.on('disconnect', () => {
-      console.log('[WA] Socket.io disconnected');
+      // console.log('[WA] Socket.io disconnected');
       setSocketOk(false);
     });
 
     socket.on('connect_error', (err) => {
-      console.warn('[WA] Socket.io connect error:', err.message);
+      // console.warn('[WA] Socket.io connect error:', err.message);
       setBridgeStatus('offline');
     });
 
     socket.on('qr', ({ qr }) => {
-      console.log('[WA] QR received');
+      // console.log('[WA] QR received');
       setQrDataUrl(qr);
       setBridgeStatus('qr');
     });
 
     socket.on('ready', () => {
-      console.log('[WA] Bridge ready');
+      // console.log('[WA] Bridge ready');
       setBridgeStatus('ready');
       setQrDataUrl(null);
       fetchChats();
     });
 
     socket.on('disconnected', ({ reason }) => {
-      console.log('[WA] Bridge disconnected:', reason);
+      // console.log('[WA] Bridge disconnected:', reason);
       setBridgeStatus('qr');
       setQrDataUrl(null);
     });
 
     socket.on('history_synced', ({ chats: c, messages: m }) => {
-      console.log(`[WA] History synced: ${c} chats, ${m} messages`);
+      // console.log(`[WA] History synced: ${c} chats, ${m} messages`);
       setHistorySync({ chats: c, messages: m });
       fetchChats();
       if (selectedRef.current) fetchMessages(selectedRef.current.chatId);
@@ -531,7 +531,7 @@ const WhatsApp = () => {
     });
 
     socket.on('contacts_resolved', ({ count }) => {
-      console.log(`[WA] ${count} contact names resolved — refreshing chat list`);
+      // console.log(`[WA] ${count} contact names resolved — refreshing chat list`);
       fetchChats();
     });
 
@@ -550,7 +550,7 @@ const WhatsApp = () => {
       if (bridgeStatus === 'ready' && !loading && !staleCheckDone) {
           const timer = setTimeout(() => {
               if (chatsRef.current.length === 0) {
-                  console.warn('[WA] Bridge is ready but no chats loaded after 15s. Session might be stale.');
+                  // console.warn('[WA] Bridge is ready but no chats loaded after 15s. Session might be stale.');
                   // We show the empty state with a reconnect button
               }
               setStaleCheckDone(true);
@@ -641,7 +641,7 @@ const WhatsApp = () => {
       await api.post('/api/whatsapp/send', { to: selected.chatId, content: newMsg });
       setNewMsg('');
       setTimeout(() => fetchMessages(selected.chatId), 500);
-    } catch (e) { console.error('Send failed', e); }
+    // } catch (e) { console.error('Send failed', e); }
     finally { setSending(false); }
   };
 
@@ -652,7 +652,7 @@ const WhatsApp = () => {
       setShowMenu(false);
       await api.post('/api/whatsapp/bridge/logout');
       window.location.reload();
-    } catch (e) { console.error('Logout failed', e); setResetting(false); }
+    // } catch (e) { console.error('Logout failed', e); setResetting(false); }
   };
 
   const handleReset = async () => {
@@ -669,7 +669,7 @@ const WhatsApp = () => {
       try {
         const databases = await window.indexedDB.databases();
         databases.forEach(db => window.indexedDB.deleteDatabase(db.name));
-      } catch (e) { console.warn('IDB clear failed', e); }
+      // } catch (e) { console.warn('IDB clear failed', e); }
 
       // 2. Clear local React state
       setChats([]);
@@ -686,7 +686,7 @@ const WhatsApp = () => {
         window.location.href = '/whatsapp'; // Force hard reload to base URL
       }, 3000);
     } catch (e) { 
-      console.error('Reset failed', e); 
+      // console.error('Reset failed', e); 
       setResetting(false); 
       alert('Reset failed. Check bridge logs.');
     }

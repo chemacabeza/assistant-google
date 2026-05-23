@@ -64,7 +64,7 @@ const Photos = () => {
       setActiveSession({ id: sessionData.id, mediaItemsSet: false });
       window.open(sessionData.pickerUri + '/autoclose', '_blank');
     } catch (e) {
-      console.error("Failed to create session", e);
+      // console.error("Failed to create session", e);
       setSessionError(e);
     }
   };
@@ -75,7 +75,7 @@ const Photos = () => {
       // Jump directly to the OAuth provider to bypass the intermediary login screen
       window.location.href = '/oauth2/authorization/google';
     } catch (e) {
-      console.error('Logout failed', e);
+      // console.error('Logout failed', e);
       window.location.href = '/oauth2/authorization/google';
     }
   };

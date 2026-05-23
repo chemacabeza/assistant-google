@@ -207,7 +207,7 @@ async function startBridge() {
   // 🐕 Watchdog: restart if we're stuck in 'loading' for > 60s without progress
   const watchdog = setTimeout(() => {
     if (!isConnected && !currentQr) {
-      console.log('[Bridge] 🐕 Watchdog: Stuck in loading for 60s. Restarting...');
+      // console.log('[Bridge] 🐕 Watchdog: Stuck in loading for 60s. Restarting...');
       process.exit(1);
     }
   }, 60000);
@@ -221,7 +221,7 @@ async function startBridge() {
     version: [2, 3000, 1015901307],
   }));
 
-  console.log(`[Bridge] Starting Baileys with WA v${version.join('.')}`);
+  // console.log(`[Bridge] Starting Baileys with WA v${version.join('.')}`);
 
   sock = makeWASocket({
     version,
@@ -245,7 +245,7 @@ async function startBridge() {
 
     // New QR code generated
     if (qr) {
-      console.log('[Bridge] QR received — waiting for scan');
+      // console.log('[Bridge] QR received — waiting for scan');
       clearTimeout(watchdog);
       currentQr   = await qrcode.toDataURL(qr);
       isConnected = false;
@@ -254,7 +254,7 @@ async function startBridge() {
 
     // Successfully connected
     if (connection === 'open') {
-      console.log('[Bridge] ✅ Connected to WhatsApp');
+      // console.log('[Bridge] ✅ Connected to WhatsApp');
       clearTimeout(watchdog);
       currentQr   = null;
       isConnected = true;
@@ -271,17 +271,17 @@ async function startBridge() {
         ? lastDisconnect.error.output.statusCode
         : undefined;
 
-      console.log('[Bridge] Connection closed — status:', statusCode);
+      // console.log('[Bridge] Connection closed — status:', statusCode);
 
       if (statusCode === DisconnectReason.loggedOut) {
         // User explicitly logged out — clear saved credentials
-        console.log('[Bridge] Logged out — clearing session, will show new QR');
+        // console.log('[Bridge] Logged out — clearing session, will show new QR');
         try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }); } catch {}
         io.emit('disconnected', { reason: 'logged_out' });
         setTimeout(startBridge, 1000);
       } else if (statusCode !== DisconnectReason.connectionClosed) {
         // Temporary disconnect — reconnect automatically
-        console.log('[Bridge] Reconnecting in 3 s...');
+        // console.log('[Bridge] Reconnecting in 3 s...');
         sock?.ws?.close();
         setTimeout(startBridge, 3000);
       }
@@ -290,7 +290,7 @@ async function startBridge() {
 
   // ── Full history sync (fires once after first connection) ─────────────────
   sock.ev.on('messaging-history.set', async ({ chats, contacts, messages, syncType }) => {
-    console.log(`[Bridge] History sync started: ${chats?.length} chats, ${contacts?.length} contacts, ${messages?.length} messages (type=${syncType})`);
+    // console.log(`[Bridge] History sync started: ${chats?.length} chats, ${contacts?.length} contacts, ${messages?.length} messages (type=${syncType})`);
 
     // Build a contact name map: JID → display name
     // Priority: notify (push name seen on device) > name (address book)
@@ -307,7 +307,7 @@ async function startBridge() {
       }
     }
 
-    console.log(`[Bridge] Resolved ${nameMap.size} contact names from history`);
+    // console.log(`[Bridge] Resolved ${nameMap.size} contact names from history`);
 
     // Sync chats — pass resolved name from nameMap
     let chatsSynced = 0;
@@ -324,12 +324,12 @@ async function startBridge() {
       await syncMessage(msg);
       msgsSynced++;
       if (msgsSynced % 200 === 0) {
-        console.log(`[Bridge] Synced ${msgsSynced}/${messages.length} messages...`);
+        // console.log(`[Bridge] Synced ${msgsSynced}/${messages.length} messages...`);
         await new Promise(r => setTimeout(r, 50));
       }
     }
 
-    console.log(`[Bridge] ✅ History sync complete — ${chatsSynced} chats, ${msgsSynced} messages, ${nameMap.size} names resolved`);
+    // console.log(`[Bridge] ✅ History sync complete — ${chatsSynced} chats, ${msgsSynced} messages, ${nameMap.size} names resolved`);
     io.emit('history_synced', { chats: chatsSynced, messages: msgsSynced });
 
     // Trigger a one-time deep scan after history sync completes
@@ -395,7 +395,7 @@ async function startBridge() {
       updated++;
     }
     if (updated > 0) {
-      console.log(`[Bridge] ✅ Resolved ${updated} names via contacts.upsert`);
+      // console.log(`[Bridge] ✅ Resolved ${updated} names via contacts.upsert`);
       io.emit('contacts_resolved', { count: updated });
     }
   });
@@ -471,15 +471,15 @@ async function runIdentityResolution() {
     }
 
     if (resolved > 0) {
-      console.log(`[Bridge] 🩺 Healer resolved ${resolved} names. Re-scanning in 30s.`);
+      // console.log(`[Bridge] 🩺 Healer resolved ${resolved} names. Re-scanning in 30s.`);
       io.emit('contacts_resolved', { count: resolved });
       setTimeout(runIdentityResolution, 30000);
     } else {
-      console.log('[Bridge] 🩺 All identities stable. Next scan in 2m.');
+      // console.log('[Bridge] 🩺 All identities stable. Next scan in 2m.');
       setTimeout(runIdentityResolution, 120000);
     }
   } catch (e) {
-    console.error('[Bridge] 🩺 Identity resolution error:', e.message);
+    // console.error('[Bridge] 🩺 Identity resolution error:', e.message);
     setTimeout(runIdentityResolution, 60000);
   }
 }
@@ -515,7 +515,7 @@ app.post('/send', async (req, res) => {
     });
     res.json({ success: true, messageId: result.key.id });
   } catch (err) {
-    console.error('[Bridge] /send error:', err.message);
+    // console.error('[Bridge] /send error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -543,7 +543,7 @@ app.get('/media/:chatId/:messageId', async (req, res) => {
     let msg = await store.loadMessage(chatId, messageId);
     
     if (!msg || !msg.message) {
-      console.log(`[Bridge] Message ${messageId} not in RAM, fetching rawPayload from backend...`);
+      // console.log(`[Bridge] Message ${messageId} not in RAM, fetching rawPayload from backend...`);
       const remoteMsg = await axios.get(`${BACKEND_URL}/api/whatsapp/messages/wa/${messageId}`).catch(() => null);
       if (!remoteMsg?.data?.rawPayload) return res.status(404).json({ error: 'Message metadata not found' });
       
@@ -552,7 +552,7 @@ app.get('/media/:chatId/:messageId', async (req, res) => {
     }
 
     // 3. Download from WhatsApp
-    console.log(`[Bridge] Downloading media for ${messageId}...`);
+    // console.log(`[Bridge] Downloading media for ${messageId}...`);
     const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger });
     const mimetype = getWrappedMimetype(msg.message);
     
@@ -563,7 +563,7 @@ app.get('/media/:chatId/:messageId', async (req, res) => {
     res.set('Content-Type', mimetype);
     res.send(buffer);
   } catch (err) {
-    console.error(`[Bridge] Media download failed for ${messageId}:`, err.message);
+    // console.error(`[Bridge] Media download failed for ${messageId}:`, err.message);
     res.status(500).json({ error: 'Failed to download media' });
   }
 });
@@ -607,14 +607,14 @@ app.get('/avatar/:chatId', async (req, res) => {
  * Clean Logout: tell WA to invalidate this session, then wipe local creds.
  */
 app.post('/logout', async (req, res) => {
-  console.log('[Bridge] 🔴 Logout requested');
+  // console.log('[Bridge] 🔴 Logout requested');
   try {
     if (sock) {
       await sock.logout().catch(() => {});
       sock.end();
     }
     if (fs.existsSync(AUTH_DIR)) {
-      console.log('[Bridge] Wiping auth_info...');
+      // console.log('[Bridge] Wiping auth_info...');
       fs.rmSync(AUTH_DIR, { recursive: true, force: true });
     }
     res.json({ success: true, message: 'Logged out successfully' });
@@ -622,7 +622,7 @@ app.post('/logout', async (req, res) => {
     // Trigger restart to ensure a clean state for the next QR
     setTimeout(() => process.exit(0), 1000);
   } catch (err) {
-    console.error('[Bridge] Logout failed:', err.message);
+    // console.error('[Bridge] Logout failed:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -632,25 +632,25 @@ app.post('/logout', async (req, res) => {
  * This is the "Nuclear Option" for stuck or corrupted states.
  */
 app.post('/reset', async (req, res) => {
-  console.log('[Bridge] ☢️ HARD RESET REQUESTED');
+  // console.log('[Bridge] ☢️ HARD RESET REQUESTED');
   try {
     // 1. Forcefully close the socket first
     if (sock) {
-      console.log('[Bridge] Closing socket...');
+      // console.log('[Bridge] Closing socket...');
       sock.ev.removeAllListeners();
       try { sock.ws.close(); } catch (e) {}
       sock = null;
     }
 
     // 2. Tell backend to wipe its database immediately
-    console.log('[Bridge] Requesting data purge from backend...');
+    // console.log('[Bridge] Requesting data purge from backend...');
     await axios.post(`${BACKEND_URL}/api/whatsapp/bridge/clear-all`).catch(e => {
-        console.error('[Bridge] Backend purge failed:', e.message);
+        // console.error('[Bridge] Backend purge failed:', e.message);
     });
 
     // 3. NUCLEAR WIPE: Delete the entire session directory
     if (fs.existsSync(SESSION_DIR)) {
-      console.log(`[Bridge] Nuking local session directory: ${SESSION_DIR}`);
+      // console.log(`[Bridge] Nuking local session directory: ${SESSION_DIR}`);
       fs.rmSync(SESSION_DIR, { recursive: true, force: true });
     }
     
@@ -661,18 +661,18 @@ app.post('/reset', async (req, res) => {
     
     // 4. Force exit after a short delay to allow response to send
     setTimeout(() => {
-      console.log('[Bridge] Exiting for clean restart...');
+      // console.log('[Bridge] Exiting for clean restart...');
       process.exit(0);
     }, 500);
   } catch (err) {
-    console.error('[Bridge] Hard reset failed:', err.message);
+    // console.error('[Bridge] Hard reset failed:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ── Socket.io ─────────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
-  console.log('[Bridge] Frontend connected via Socket.io');
+  // console.log('[Bridge] Frontend connected via Socket.io');
   // Emit comprehensive state so the frontend never misses a QR/ready event
   socket.emit('state', {
     connected: isConnected,
@@ -682,13 +682,13 @@ io.on('connection', (socket) => {
   // Also emit legacy events for backward compatibility
   if (currentQr)   socket.emit('qr',    { qr: currentQr });
   if (isConnected) socket.emit('ready', { status: 'connected' });
-  socket.on('disconnect', () => console.log('[Bridge] Frontend disconnected'));
+  // socket.on('disconnect', () => console.log('[Bridge] Frontend disconnected'));
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Bridge] HTTP + Socket.io listening on port ${PORT}`);
-  console.log(`[Bridge] Backend URL : ${BACKEND_URL}`);
-  console.log(`[Bridge] Session dir : ${SESSION_DIR}`);
+  // console.log(`[Bridge] HTTP + Socket.io listening on port ${PORT}`);
+  // console.log(`[Bridge] Backend URL : ${BACKEND_URL}`);
+  // console.log(`[Bridge] Session dir : ${SESSION_DIR}`);
   startBridge();
 });

@@ -19,7 +19,7 @@ export const useAuthStore = create((set) => ({
     try {
       await api.post('/api/auth/logout');
     } catch (e) {
-      console.error(e);
+      // console.error(e);
     }
     set({ user: null, isAuthenticated: false });
     window.location.href = '/login';

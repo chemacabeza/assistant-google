@@ -12,7 +12,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleAllExceptions(Exception ex) {
-        System.err.println("Unhandled exception: " + ex);
+        // System.err.println("Unhandled exception: " + ex);
         ErrorResponse errorResponse = new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 ex.getMessage(),

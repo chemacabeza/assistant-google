@@ -61,7 +61,7 @@ public class TelegramPollingService {
                         
                         if (message.has("text")) {
                             String text = message.get("text").asText();
-                            System.out.println("Received Telegram message: " + text);
+                            // System.out.println("Received Telegram message: " + text);
 
                             // Send "Processing..." or just handle it
                             // Route to Assistant
@@ -75,7 +75,7 @@ public class TelegramPollingService {
                 }
             }
         } catch (Exception e) {
-            System.err.println("Telegram Polling Error: " + e.getMessage());
+            // System.err.println("Telegram Polling Error: " + e.getMessage());
         }
     }
 }

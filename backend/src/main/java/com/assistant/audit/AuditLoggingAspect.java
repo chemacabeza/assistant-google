@@ -42,7 +42,7 @@ public class AuditLoggingAspect {
                 auditLogRepository.save(logEntry);
             }
         } catch (Exception e) {
-            System.err.println("Failed to save audit log for action: " + auditable.actionType() + " " + e);
+            // System.err.println("Failed to save audit log for action: " + auditable.actionType() + " " + e);
         }
     }
 }

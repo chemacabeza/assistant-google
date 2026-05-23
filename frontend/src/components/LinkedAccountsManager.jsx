@@ -44,7 +44,7 @@ const LinkedAccountsManager = () => {
       await api.delete(`/api/accounts/${id}`);
       refetch();
     } catch (e) {
-      console.error('Failed to delete account', e);
+      // console.error('Failed to delete account', e);
     }
   };
 

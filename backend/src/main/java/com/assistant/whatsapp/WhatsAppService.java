@@ -38,7 +38,7 @@ public class WhatsAppService {
 
             return result != null ? result : Map.of("success", true);
         } catch (Exception e) {
-            System.err.println("WhatsApp Bridge error: " + e.getMessage());
+            // System.err.println("WhatsApp Bridge error: " + e.getMessage());
             return Map.of("success", false, "error", e.getMessage());
         }
     }

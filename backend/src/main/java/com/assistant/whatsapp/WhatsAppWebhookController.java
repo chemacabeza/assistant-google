@@ -31,7 +31,7 @@ public class WhatsAppWebhookController {
             @RequestParam("hub.challenge") String challenge) {
 
         if ("subscribe".equals(mode) && verifyToken.equals(token)) {
-            System.out.println("WhatsApp Webhook Verified!");
+            // System.out.println("WhatsApp Webhook Verified!");
             return ResponseEntity.ok(challenge);
         } else {
             return ResponseEntity.status(403).build();
@@ -85,7 +85,7 @@ public class WhatsAppWebhookController {
                                             messageSid
                                         );
                                         repository.save(waMsg);
-                                        System.out.println("Saved incoming WhatsApp message from " + profileName);
+                                        // System.out.println("Saved incoming WhatsApp message from " + profileName);
                                     }
                                 }
                             }
@@ -94,7 +94,7 @@ public class WhatsAppWebhookController {
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error parsing WhatsApp webhook: " + e.getMessage());
+            // System.err.println("Error parsing WhatsApp webhook: " + e.getMessage());
         }
         return ResponseEntity.ok().build();
     }

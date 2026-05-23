@@ -29,7 +29,7 @@ const Templates = () => {
       try {
         return (await api.get('/api/contacts')).data;
       } catch (e) {
-        console.error("Failed to fetch contacts", e);
+        // console.error("Failed to fetch contacts", e);
         return [];
       }
     }

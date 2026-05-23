@@ -36,7 +36,7 @@ const Gmail = () => {
               const detailRes = await api.get(`/api/gmail/messages/${msg.id}`);
               return detailRes.data;
            } catch (e) {
-              console.error("Failed fetching detail for", msg.id);
+              // console.error("Failed fetching detail for", msg.id);
               return msg;
            }
         })

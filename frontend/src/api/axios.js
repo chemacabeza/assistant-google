@@ -13,7 +13,7 @@ api.interceptors.response.use(
     // Check if the user is unauthorized, meaning the Spring Session cookie expired or is missing
     if (error.response && error.response.status === 401) {
       // Optional: automatically clear user state if we were fetching profile
-      console.warn("Unauthorized access or session expired.");
+      // console.warn("Unauthorized access or session expired.");
     }
     return Promise.reject(error);
   }

@@ -37,7 +37,7 @@ const Settings = () => {
       const res = await api.get('/api/auth/profile');
       setProfile(res.data);
     } catch (e) {
-      console.error('Failed to load profile:', e);
+      // console.error('Failed to load profile:', e);
     } finally {
       setLoadingProfile(false);
     }
@@ -48,7 +48,7 @@ const Settings = () => {
       const res = await api.get('/api/audit');
       setAuditLogs(res.data || []);
     } catch (e) {
-      console.error('Failed to load audit logs:', e);
+      // console.error('Failed to load audit logs:', e);
     } finally {
       setLoadingLogs(false);
     }
@@ -60,7 +60,7 @@ const Settings = () => {
       await api.post('/api/auth/logout');
       navigate('/login');
     } catch (e) {
-      console.error('Logout failed:', e);
+      // console.error('Logout failed:', e);
       // Even if the call fails, redirect to login
       navigate('/login');
     }

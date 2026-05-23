@@ -35,8 +35,8 @@ public class TelegramService {
             .retrieve()
             .bodyToMono(String.class)
             .subscribe(
-                response -> System.out.println("Telegram sent: " + response),
-                error -> System.err.println("Telegram error: " + error.getMessage())
+                // response -> System.out.println("Telegram sent: " + response),
+                // error -> System.err.println("Telegram error: " + error.getMessage())
             );
     }
 }

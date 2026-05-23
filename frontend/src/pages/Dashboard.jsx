@@ -48,7 +48,7 @@ const Dashboard = () => {
           setEmails(fullEmails.filter(e => e !== null));
         }
       } catch (err) {
-        console.error("Failed to load dashboard sync:", err);
+        // console.error("Failed to load dashboard sync:", err);
       } finally {
         setLoading(false);
       }

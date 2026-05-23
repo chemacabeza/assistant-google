@@ -58,7 +58,7 @@ const Configuration = () => {
           },
         });
       } catch (e) {
-        console.error('Failed to load configuration:', e);
+        // console.error('Failed to load configuration:', e);
       } finally {
         setLoading(false);
       }
@@ -86,7 +86,7 @@ const Configuration = () => {
         setStatusMsg(res.data?.message || 'Save failed');
       }
     } catch (e) {
-      console.error('Failed to save configuration:', e);
+      // console.error('Failed to save configuration:', e);
       setStatusMsg('Error saving configuration: ' + (e.response?.data?.message || e.message));
     } finally {
       setSaving(false);
