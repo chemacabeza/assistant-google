@@ -641,7 +641,7 @@ const WhatsApp = () => {
       await api.post('/api/whatsapp/send', { to: selected.chatId, content: newMsg });
       setNewMsg('');
       setTimeout(() => fetchMessages(selected.chatId), 500);
-    // } catch (e) { console.error('Send failed', e); }
+    } catch (e) { console.error('Send failed', e); }
     finally { setSending(false); }
   };
 
@@ -652,7 +652,7 @@ const WhatsApp = () => {
       setShowMenu(false);
       await api.post('/api/whatsapp/bridge/logout');
       window.location.reload();
-    // } catch (e) { console.error('Logout failed', e); setResetting(false); }
+    } catch (e) { console.error('Logout failed', e); setResetting(false); }
   };
 
   const handleReset = async () => {
@@ -669,7 +669,7 @@ const WhatsApp = () => {
       try {
         const databases = await window.indexedDB.databases();
         databases.forEach(db => window.indexedDB.deleteDatabase(db.name));
-      // } catch (e) { console.warn('IDB clear failed', e); }
+      } catch (e) { console.warn('IDB clear failed', e); }
 
       // 2. Clear local React state
       setChats([]);
