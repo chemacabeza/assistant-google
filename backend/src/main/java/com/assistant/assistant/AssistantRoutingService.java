@@ -6,11 +6,14 @@ import com.assistant.gmail.GmailService;
 import com.assistant.maps.MapsService;
 import com.assistant.whatsapp.WhatsAppService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -22,6 +25,10 @@ import java.util.Map;
 
 @Service
 public class AssistantRoutingService {
+
+    private static final Logger log = LoggerFactory.getLogger(AssistantRoutingService.class);
+    private static final int MAX_RETRIES = 3;
+    private static final long RETRY_BASE_DELAY_MS = 2000;
 
     @Value("${OPENAI_API_KEY}")
     private String openAiApiKey;
@@ -196,14 +203,7 @@ public class AssistantRoutingService {
         requestBody.put("tools", assistantTools);
 
         try {
-            Map response = webClient.post()
-                    .uri("https://api.openai.com/v1/chat/completions")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + openAiApiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(requestBody)
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .block();
+            Map response = callOpenAiWithRetry(requestBody);
 
             List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
             Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
@@ -249,6 +249,39 @@ public class AssistantRoutingService {
                 "rawQuery", originalQuery
             );
         }
+    }
+
+    /**
+     * Calls the OpenAI API with exponential backoff retry for 429 rate-limit errors.
+     * Retries up to MAX_RETRIES times with delays of 2s, 4s, 8s.
+     */
+    private Map callOpenAiWithRetry(Map<String, Object> requestBody) {
+        for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                return webClient.post()
+                        .uri("https://api.openai.com/v1/chat/completions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + openAiApiKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(requestBody)
+                        .retrieve()
+                        .bodyToMono(Map.class)
+                        .block();
+            } catch (WebClientResponseException e) {
+                if (e.getStatusCode().value() == 429 && attempt < MAX_RETRIES) {
+                    long delay = RETRY_BASE_DELAY_MS * (1L << attempt); // 2s, 4s, 8s
+                    log.warn("OpenAI rate limit hit (429). Retrying in {}ms (attempt {}/{})...", delay, attempt + 1, MAX_RETRIES);
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("Retry interrupted", ie);
+                    }
+                } else {
+                    throw e; // Not a 429, or retries exhausted — propagate
+                }
+            }
+        }
+        throw new RuntimeException("OpenAI API call failed after " + MAX_RETRIES + " retries due to rate limiting (429).");
     }
 
     private Object executeInternalTool(String name, String argumentsJson) {

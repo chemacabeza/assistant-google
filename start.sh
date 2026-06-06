@@ -20,7 +20,7 @@ docker compose up -d
 echo "========================================"
 echo "Services started successfully:"
 echo "Frontend UI:   http://localhost:5173"
-echo "Backend API:   http://localhost:8080"
+echo "Backend API:   http://localhost:8081"
 echo "PostgreSQL:    localhost:5433"
 echo "========================================"
 echo ""

@@ -21,9 +21,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      network: host
     container_name: assistant-backend
     ports:
-      - "8080:8080"
+      - "8081:8080"
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${POSTGRES_DB:-assistant_db}
       - POSTGRES_USER=${POSTGRES_USER:-assistant_user}
@@ -53,6 +54,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      network: host
       args:
         - VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY}
     container_name: assistant-frontend
@@ -67,6 +69,7 @@ services:
     build:
       context: ./whatsapp-bridge
       dockerfile: Dockerfile
+      network: host
     container_name: assistant-whatsapp-bridge
     ports:
       - "3001:3001"
