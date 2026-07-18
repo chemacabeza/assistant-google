@@ -153,7 +153,20 @@ public class AssistantRoutingService {
     );
 
     public AssistantRoutingService(WebClient.Builder webClientBuilder, GmailService gmailService, CalendarService calendarService, MapsService mapsService, ContactsService contactsService, WhatsAppService whatsappService, ObjectMapper objectMapper) {
-        this.webClient = webClientBuilder.build();
+        // Disable connection pooling (newConnection) and enforce HTTP/1.1 to avoid Cloudflare/HTTP/2 premature closes
+        reactor.netty.http.client.HttpClient httpClient = 
+            reactor.netty.http.client.HttpClient.newConnection()
+                .protocol(reactor.netty.http.HttpProtocol.HTTP11)
+                .option(io.netty.channel.ChannelOption.CONNECT_TIMEOUT_MILLIS, 30000)
+                .responseTimeout(java.time.Duration.ofSeconds(180)) // large timeout for complex/long generations
+                .doOnConnected(conn -> conn
+                    .addHandlerLast(new io.netty.handler.timeout.ReadTimeoutHandler(180, java.util.concurrent.TimeUnit.SECONDS))
+                    .addHandlerLast(new io.netty.handler.timeout.WriteTimeoutHandler(180, java.util.concurrent.TimeUnit.SECONDS)));
+
+        this.webClient = webClientBuilder
+                .clientConnector(new org.springframework.http.client.reactive.ReactorClientHttpConnector(httpClient))
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
+                .build();
         this.gmailService = gmailService;
         this.calendarService = calendarService;
         this.mapsService = mapsService;
@@ -179,7 +192,8 @@ public class AssistantRoutingService {
             + "WRONG: Leg1 = 15:38-16:00, Leg2 = 16:00-16:08. This would arrive at C at 16:08, which is LATE. "
             + "CORRECT: Leg1 = 15:30-15:52, Leg2 = 15:52-16:00. This arrives at C at exactly 16:00. "
             + "NEVER set the last event to START at the arrival time. The last event must END at the arrival time. "
-            + "LANGUAGE: You are fully bilingual in English and Spanish. Always detect the language the user writes in and respond in that same language. If the user writes in Spanish, respond entirely in Spanish. If the user writes in English, respond in English. Calendar event titles and descriptions should also match the user's language. ANDROID AUTO: A navigation link labeled '🚗 Android Auto' is automatically appended to the description of any calendar event with a location or destination address. You do not need to add this manually.";
+            + "LANGUAGE: You are fully bilingual in English and Spanish. Always detect the language the user writes in and respond in that same language. If the user writes in Spanish, respond entirely in Spanish. If the user writes in English, respond in English. Calendar event titles and descriptions should also match the user's language. ANDROID AUTO: A navigation link labeled '🚗 Android Auto' is automatically appended to the description of any calendar event with a location or destination address. You do not need to add this manually. "
+            + "BATCHING LONG OPERATIONS: To prevent timeouts, when you need to schedule a large sequence of events (more than 10 events), you MUST only generate up to 10 schedule_calendar_event tool calls in a single response. After the system executes them and returns the results to you, generate the next batch of up to 10. Repeat this process until all requested operations are complete.";
         messages.add(Map.of("role", "system", "content", prompt));
         
         if (history != null) {
