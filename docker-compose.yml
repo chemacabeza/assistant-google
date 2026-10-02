@@ -7,12 +7,12 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-assistant_password}
       POSTGRES_DB: ${POSTGRES_DB:-assistant_db}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U assistant_user -d assistant_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -24,7 +24,7 @@ services:
       network: host
     container_name: assistant-backend
     ports:
-      - "8081:8080"
+      - "127.0.0.1:8081:8080"
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${POSTGRES_DB:-assistant_db}
       - POSTGRES_USER=${POSTGRES_USER:-assistant_user}
@@ -44,11 +44,11 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/auth/profile || exit 0"]
+      test: ["CMD-SHELL", "nc -z localhost 8080"]
       interval: 10s
       timeout: 5s
-      retries: 6
-      start_period: 20s
+      retries: 12
+      start_period: 30s
 
   frontend:
     build:
@@ -72,7 +72,7 @@ services:
       network: host
     container_name: assistant-whatsapp-bridge
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     environment:
       - BACKEND_URL=http://backend:8080
       - SESSION_DIR=/app/sessions
@@ -83,6 +83,12 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3001/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 volumes:
   postgres_data:

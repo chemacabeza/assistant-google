@@ -4,3 +4,7 @@
 # dist
 .env
 .DS_Store
+node20/
+node_modules/
+src/
+public/
