@@ -29,6 +29,7 @@ replay_pid*
 *.tgz
 # Allow important JSON config files
 !**/package.json
+!**/package-lock.json
 !**/tsconfig*.json
 
 # Maven build output

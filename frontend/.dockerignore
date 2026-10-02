@@ -5,6 +5,6 @@
 .env
 .DS_Store
 node20/
+node20.tar.xz
 node_modules/
-src/
-public/
+dist/

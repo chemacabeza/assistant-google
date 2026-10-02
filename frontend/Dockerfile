@@ -1,7 +1,21 @@
+# ── Build stage ─────────────────────────────────────────────────────────────────────────────────────────
+FROM node:20-alpine AS build
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+
+COPY . .
+
+# Vite inlines VITE_* values at build time
+ARG VITE_GOOGLE_MAPS_API_KEY
+ENV VITE_GOOGLE_MAPS_API_KEY=$VITE_GOOGLE_MAPS_API_KEY
+RUN npm run build
+
+# ── Runtime stage ──────────────────────────────────────────────────────────────────────────────────────
 FROM nginx:stable-alpine
 
-# The 'dist' folder is expected to be built on the host prior to docker build
-COPY dist /usr/share/nginx/html
+COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
