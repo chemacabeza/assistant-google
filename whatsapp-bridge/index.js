@@ -59,8 +59,22 @@ const logger = pino({ level: 'silent' });
 // In-memory store for getMessage callbacks (needed for message retry/decryption)
 const store = makeInMemoryStore({ logger });
 const STORE_FILE = path.join(SESSION_DIR, "baileys_store.json");
+fs.mkdirSync(SESSION_DIR, { recursive: true });
 if (fs.existsSync(STORE_FILE)) store.readFromFile(STORE_FILE);
-setInterval(() => store.writeToFile(STORE_FILE), 10000);
+const storeFlush = setInterval(() => {
+  try { store.writeToFile(STORE_FILE); } catch { /* never crash on a cache flush */ }
+}, 10000);
+
+/**
+ * Empties SESSION_DIR without removing the directory itself. In Docker the
+ * directory is a volume mount point, so rmSync() on it fails with EBUSY.
+ */
+function wipeSessionDir() {
+  if (!fs.existsSync(SESSION_DIR)) return;
+  for (const entry of fs.readdirSync(SESSION_DIR)) {
+    fs.rmSync(path.join(SESSION_DIR, entry), { recursive: true, force: true });
+  }
+}
 
 // ── Bridge state ──────────────────────────────────────────────────────────────
 let currentQr    = null;   // base64 data URL for current QR code
@@ -648,12 +662,11 @@ app.post('/reset', async (req, res) => {
         // console.error('[Bridge] Backend purge failed:', e.message);
     });
 
-    // 3. NUCLEAR WIPE: Delete the entire session directory
-    if (fs.existsSync(SESSION_DIR)) {
-      // console.log(`[Bridge] Nuking local session directory: ${SESSION_DIR}`);
-      fs.rmSync(SESSION_DIR, { recursive: true, force: true });
-    }
-    
+    // 3. NUCLEAR WIPE: empty the session directory (credentials + message cache).
+    //    Stop the periodic cache flush first so it cannot re-create the store file.
+    clearInterval(storeFlush);
+    wipeSessionDir();
+
     isConnected = false;
     currentQr = null;
     

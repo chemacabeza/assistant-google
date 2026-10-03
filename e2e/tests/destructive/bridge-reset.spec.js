@@ -42,11 +42,6 @@ test.describe('WhatsApp data purge', () => {
   });
 
   test('bridge hard reset purges data, then the bridge restarts and serves again', async ({ request, playwright }) => {
-    // KNOWN DEFECT: /reset deletes SESSION_DIR (/app/sessions), which is a Docker volume mount
-    // point, so rmSync fails with EBUSY and the endpoint answers 500 instead of restarting.
-    // Remove test.fail() once the reset empties the directory instead of removing it.
-    test.fail();
-
     const backend = await playwright.request.newContext({ baseURL: urls.backend });
     const chatId = `e2e-${runId()}-reset@s.whatsapp.net`;
     await seedChat(backend, chatId);
