@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings, Save, ExternalLink, Key, ToggleLeft, ToggleRight, Type, Shield, Map, Brain, Mail, Calendar, Users, MessageSquare, Loader2 } from 'lucide-react';
 import { api } from '../api/axios';
 import LinkedAccountsManager from '../components/LinkedAccountsManager';

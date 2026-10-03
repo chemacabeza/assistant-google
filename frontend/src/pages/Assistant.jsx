@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Send, Bot, Calendar, Mail } from 'lucide-react';
 import { api } from '../api/axios';

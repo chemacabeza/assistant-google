@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Search, Image as ImageIcon, Settings, HelpCircle, 
-  ChevronDown, Filter, Grid, List, MoreVertical, Users 
+  ChevronDown, Grid, List, MoreVertical, Users 
 } from 'lucide-react';
 import { api } from '../api/axios';
 import { Link } from 'react-router-dom';

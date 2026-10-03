@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Mail, Calendar as CalendarIcon, Loader2, ArrowRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { LayoutDashboard, Mail, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import { api } from '../api/axios';
 
 const Dashboard = () => {

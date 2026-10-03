@@ -1,4 +1,3 @@
-import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { Mail, Calendar, Settings, Bot, BookTemplate, MapPin, LayoutDashboard, Cog, MessageCircle, HardDrive, Image as ImageIcon } from 'lucide-react';
 

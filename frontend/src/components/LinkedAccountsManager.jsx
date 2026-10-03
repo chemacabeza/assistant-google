@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Users, Plus, Trash2, Mail, Loader2, AlertCircle } from 'lucide-react';
 import { api } from '../api/axios';

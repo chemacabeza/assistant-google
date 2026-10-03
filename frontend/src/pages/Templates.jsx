@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, Plus, Trash2, X, Tag } from 'lucide-react';
+import { FileText, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../api/axios';
 
 const Templates = () => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Calendar as CalendarIcon, MapPin, Clock, Plus, X } from 'lucide-react';
 import { api } from '../api/axios';
@@ -8,7 +8,7 @@ const Calendar = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [eventData, setEventData] = useState({ summary: '', description: '', startDate: '', startTime: '', endDate: '', endTime: '' });
 
-  const { data: events, isLoading, refetch } = useQuery({
+  const { data: events, isLoading } = useQuery({
     queryKey: ['calendar_events'],
     queryFn: async () => {
       const res = await api.get('/api/calendar/events', { params: { maxResults: 10 } });

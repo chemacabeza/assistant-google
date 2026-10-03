@@ -1,14 +1,14 @@
-import React, {
+import {
   useState, useEffect, useMemo, useRef, useCallback,
 } from 'react';
 import { io } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, MoreVertical, Send, Paperclip, Smile, Mic, Plus,
+  Search, MoreVertical, Send, Smile, Mic, Plus,
   CheckCheck, ShieldCheck, Globe, Loader2, X, RefreshCw,
-  Image as ImageIcon, FileText, Volume2, Video, Phone, Edit3,
-  MessageSquare, Users, CircleDot, Star, Camera, Settings,
-  Megaphone, MessageCircle, Archive, Zap, WifiOff, QrCode,
+  Image as ImageIcon, FileText, Volume2, Video, Phone,
+  MessageSquare, Users, CircleDot, Settings,
+  Megaphone, Archive, Zap, WifiOff,
 } from 'lucide-react';
 import { api } from '../api/axios';
 
@@ -400,6 +400,7 @@ const WhatsApp = () => {
   const [filter, setFilter]             = useState('All');
   const [qrDataUrl, setQrDataUrl]       = useState(null);
   const [historySync, setHistorySync]   = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [socketOk, setSocketOk]         = useState(false);
   const [showMenu, setShowMenu]         = useState(false);
   const [resetting, setResetting]       = useState(false);
@@ -492,7 +493,7 @@ const WhatsApp = () => {
       setSocketOk(false);
     });
 
-    socket.on('connect_error', (err) => {
+    socket.on('connect_error', (_err) => {
       // console.warn('[WA] Socket.io connect error:', err.message);
       setBridgeStatus('offline');
     });
@@ -510,7 +511,7 @@ const WhatsApp = () => {
       fetchChats();
     });
 
-    socket.on('disconnected', ({ reason }) => {
+    socket.on('disconnected', () => {
       // console.log('[WA] Bridge disconnected:', reason);
       setBridgeStatus('qr');
       setQrDataUrl(null);
@@ -530,7 +531,7 @@ const WhatsApp = () => {
       }
     });
 
-    socket.on('contacts_resolved', ({ count }) => {
+    socket.on('contacts_resolved', () => {
       // console.log(`[WA] ${count} contact names resolved — refreshing chat list`);
       fetchChats();
     });
