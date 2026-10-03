@@ -30,7 +30,7 @@ public class AssistantRoutingService {
     private static final int MAX_RETRIES = 3;
     private static final long RETRY_BASE_DELAY_MS = 2000;
 
-    @Value("${OPENAI_API_KEY}")
+    @Value("${OPENAI_API_KEY:}")
     private String openAiApiKey;
 
     private final WebClient webClient;

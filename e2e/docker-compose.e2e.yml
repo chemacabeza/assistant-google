@@ -30,8 +30,7 @@ services:
       - GOOGLE_CLIENT_SECRET=e2e-client-secret
       - OPENAI_API_KEY=e2e-unused
       - VITE_GOOGLE_MAPS_API_KEY=e2e-unused
-      # app.frontend-url is bound from APP_FRONTENDURL (APP_FRONTEND_URL does not match the property)
-      - APP_FRONTENDURL=http://127.0.0.1:15173
+      - APP_FRONTEND_URL=http://127.0.0.1:15173
       - APP_OAUTH2_REDIRECT_URI=http://127.0.0.1:15173/login/oauth2/code/google
       # The browser reaches the mock on the published port; the backend reaches it on the compose network.
       - SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_GOOGLE_AUTHORIZATION_URI=http://127.0.0.1:19000/o/oauth2/v2/auth

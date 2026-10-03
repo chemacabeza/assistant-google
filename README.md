@@ -42,10 +42,10 @@ git clone https://github.com/chemacabeza/assistant-google.git
 cd assistant-google
 
 # 2. Copy the environment template
-cp backend/src/main/resources/.env.example backend/src/main/resources/.env
+cp .env.example .env
 
 # 3. Edit the .env file with your credentials
-nano backend/src/main/resources/.env
+nano .env
 
 # 4. Build the Docker containers
 ./build.sh
@@ -93,7 +93,7 @@ The application requires a secure OAuth 2.0 Web Client integrated with your Goog
 
 ### 2. Environment Setup
 
-Create a `.env` file in the `backend/src/main/resources/` directory (you can copy the `.env.example` file provided):
+Create a `.env` file in the repository root (copy the `.env.example` file provided). Docker Compose reads it automatically, the backend loads it when run outside Docker, and the **Configuration** page in the UI edits the same file:
 
 ```env
 POSTGRES_USER=assistant_user

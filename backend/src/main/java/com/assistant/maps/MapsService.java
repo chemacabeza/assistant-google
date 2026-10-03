@@ -8,7 +8,7 @@ import java.util.Map;
 
 @Service
 public class MapsService {
-    @Value("${VITE_GOOGLE_MAPS_API_KEY}")
+    @Value("${VITE_GOOGLE_MAPS_API_KEY:}")
     private String mapsApiKey;
 
     private final WebClient webClient;
