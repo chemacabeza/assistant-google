@@ -90,8 +90,8 @@ class EncryptedStringConverterTest {
     }
 
     @Test
-    @DisplayName("Should encrypt same value consistently")
-    void testEncryptionConsistency() {
+    @DisplayName("Should encrypt the same value to different ciphertexts that both decrypt")
+    void testEncryptionUsesRandomIv() {
         // Arrange
         String plainText = "TestData";
 
@@ -100,7 +100,9 @@ class EncryptedStringConverterTest {
         String encrypted2 = converter.convertToDatabaseColumn(plainText);
 
         // Assert
-        assertEquals(encrypted1, encrypted2);
+        assertNotEquals(encrypted1, encrypted2);
+        assertEquals(plainText, converter.convertToEntityAttribute(encrypted1));
+        assertEquals(plainText, converter.convertToEntityAttribute(encrypted2));
     }
 
     @Test

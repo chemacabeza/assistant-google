@@ -7,68 +7,51 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("CryptoUtil - Encryption and Decryption Tests")
 class CryptoUtilTest {
 
-    private CryptoUtil cryptoUtil;
-    private static final String TEST_SECRET_KEY = "1234567890123456"; // 16 bytes for AES
+    private static final String TEST_SECRET_KEY = "1234567890123456"; // 16 bytes for AES-128
 
     @BeforeEach
     void setUp() {
-        cryptoUtil = new CryptoUtil();
-        // Set the secret key via reflection since it's injected
         ReflectionTestUtils.setField(CryptoUtil.class, "secretKey", TEST_SECRET_KEY);
     }
 
     @Test
     @DisplayName("Should encrypt a plain text string successfully")
     void testEncryptSuccess() {
-        // Arrange
-        String plainText = "TestData123";
+        String encrypted = CryptoUtil.encrypt("TestData123");
 
-        // Act
-        String encrypted = CryptoUtil.encrypt(plainText);
-
-        // Assert
         assertNotNull(encrypted);
-        assertNotEquals(plainText, encrypted);
-        assertTrue(encrypted.length() > 0);
+        assertNotEquals("TestData123", encrypted);
+        assertTrue(encrypted.startsWith("v2:"), "new ciphertexts carry the GCM version prefix");
     }
 
     @Test
     @DisplayName("Should decrypt an encrypted string back to original")
     void testDecryptSuccess() {
-        // Arrange
-        String plainText = "MySecretPassword";
-        String encrypted = CryptoUtil.encrypt(plainText);
+        String encrypted = CryptoUtil.encrypt("MySecretPassword");
 
-        // Act
-        String decrypted = CryptoUtil.decrypt(encrypted);
-
-        // Assert
-        assertEquals(plainText, decrypted);
+        assertEquals("MySecretPassword", CryptoUtil.decrypt(encrypted));
     }
 
     @Test
     @DisplayName("Should handle null input in encrypt")
     void testEncryptWithNull() {
-        // Arrange & Act
-        String result = CryptoUtil.encrypt(null);
-
-        // Assert
-        assertNull(result);
+        assertNull(CryptoUtil.encrypt(null));
     }
 
     @Test
     @DisplayName("Should handle null input in decrypt")
     void testDecryptWithNull() {
-        // Arrange & Act
-        String result = CryptoUtil.decrypt(null);
-
-        // Assert
-        assertNull(result);
+        assertNull(CryptoUtil.decrypt(null));
     }
 
     @ParameterizedTest
@@ -78,90 +61,118 @@ class CryptoUtilTest {
         "WithNumbers123",
         "WithSpecialChars!@#$",
         "LongStringWithMultipleWordsAndNumbers12345",
-        "unicode-テスト-文字"
+        "unicode-テスト-文字",
+        "ya29.a0AfH6SMBx-very-long-google-access-token-with-dashes_and_underscores-0123456789"
     })
     void testEncryptDecryptRoundTrip(String input) {
-        // Act
         String encrypted = CryptoUtil.encrypt(input);
-        String decrypted = CryptoUtil.decrypt(encrypted);
 
-        // Assert
-        assertEquals(input, decrypted);
-        assertNotEquals(input, encrypted); // Should be different
+        assertEquals(input, CryptoUtil.decrypt(encrypted));
+        assertNotEquals(input, encrypted);
     }
 
     @Test
-    @DisplayName("Should encrypt same text to potentially different results (due to padding)")
-    void testEncryptConsistency() {
-        // Arrange
-        String plainText = "ConsistencyTest";
+    @DisplayName("Encrypting the same text twice gives different ciphertexts (random IV)")
+    void testEncryptIsNotDeterministic() {
+        String encrypted1 = CryptoUtil.encrypt("ConsistencyTest");
+        String encrypted2 = CryptoUtil.encrypt("ConsistencyTest");
 
-        // Act
-        String encrypted1 = CryptoUtil.encrypt(plainText);
-        String encrypted2 = CryptoUtil.encrypt(plainText);
-
-        // Assert - In ECB mode without IV, same plaintext should produce same ciphertext
-        assertEquals(encrypted1, encrypted2);
+        assertNotEquals(encrypted1, encrypted2);
+        assertEquals("ConsistencyTest", CryptoUtil.decrypt(encrypted1));
+        assertEquals("ConsistencyTest", CryptoUtil.decrypt(encrypted2));
     }
 
     @Test
     @DisplayName("Should handle empty string")
     void testEncryptEmptyString() {
-        // Arrange & Act
-        String encrypted = CryptoUtil.encrypt("");
-        String decrypted = CryptoUtil.decrypt(encrypted);
-
-        // Assert
-        assertEquals("", decrypted);
+        assertEquals("", CryptoUtil.decrypt(CryptoUtil.encrypt("")));
     }
 
     @Test
     @DisplayName("Should handle single character")
     void testEncryptSingleCharacter() {
-        // Arrange & Act
-        String encrypted = CryptoUtil.encrypt("A");
-        String decrypted = CryptoUtil.decrypt(encrypted);
-
-        // Assert
-        assertEquals("A", decrypted);
+        assertEquals("A", CryptoUtil.decrypt(CryptoUtil.encrypt("A")));
     }
 
     @Test
     @DisplayName("Should throw exception with invalid encrypted data")
     void testDecryptWithInvalidData() {
-        // Arrange
-        String invalidEncryptedData = "NotValidBase64OrEncrypted!@#$";
+        assertThrows(RuntimeException.class, () -> CryptoUtil.decrypt("NotValidBase64OrEncrypted!@#$"));
+        assertThrows(RuntimeException.class, () -> CryptoUtil.decrypt("v2:NotValidBase64OrEncrypted!@#$"));
+        assertThrows(RuntimeException.class, () -> CryptoUtil.decrypt("v2:" + Base64.getEncoder().encodeToString(new byte[5])));
+    }
 
-        // Act & Assert
-        assertThrows(RuntimeException.class, () -> CryptoUtil.decrypt(invalidEncryptedData));
+    @Test
+    @DisplayName("A tampered ciphertext is rejected instead of decrypting to garbage")
+    void testTamperedCiphertextIsRejected() {
+        String encrypted = CryptoUtil.encrypt("refresh-token-value");
+        byte[] bytes = Base64.getDecoder().decode(encrypted.substring("v2:".length()));
+        bytes[bytes.length - 1] ^= 0x01; // flip one bit in the ciphertext/tag
+        String tampered = "v2:" + Base64.getEncoder().encodeToString(bytes);
+
+        assertThrows(RuntimeException.class, () -> CryptoUtil.decrypt(tampered));
+    }
+
+    @Test
+    @DisplayName("Ciphertext cannot be decrypted with a different key")
+    void testWrongKeyIsRejected() {
+        String encrypted = CryptoUtil.encrypt("secret");
+        ReflectionTestUtils.setField(CryptoUtil.class, "secretKey", "6543210987654321");
+
+        assertThrows(RuntimeException.class, () -> CryptoUtil.decrypt(encrypted));
+    }
+
+    @Test
+    @DisplayName("Values written by the previous AES/ECB implementation still decrypt")
+    void testLegacyEcbCiphertextStillDecrypts() throws Exception {
+        Cipher legacy = Cipher.getInstance("AES"); // AES/ECB/PKCS5Padding, as before
+        legacy.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(TEST_SECRET_KEY.getBytes(StandardCharsets.UTF_8), "AES"));
+        String legacyCiphertext = Base64.getEncoder().encodeToString(
+                legacy.doFinal("legacy-stored-token".getBytes(StandardCharsets.UTF_8)));
+        assertFalse(legacyCiphertext.startsWith("v2:"));
+
+        assertEquals("legacy-stored-token", CryptoUtil.decrypt(legacyCiphertext));
     }
 
     @Test
     @DisplayName("Should throw exception when secret key is null")
     void testEncryptWithNullSecretKey() {
-        // Arrange
         ReflectionTestUtils.setField(CryptoUtil.class, "secretKey", null);
 
-        // Act & Assert
         assertThrows(RuntimeException.class, () -> CryptoUtil.encrypt("test"));
     }
 
     @Test
-    @DisplayName("Should handle Base64 encoded values correctly")
+    @DisplayName("Payload after the version prefix is valid Base64")
     void testBase64Encoding() {
-        // Arrange
-        String plainText = "BaseEncodingTest";
+        String encrypted = CryptoUtil.encrypt("BaseEncodingTest");
 
-        // Act
-        String encrypted = CryptoUtil.encrypt(plainText);
+        assertDoesNotThrow(() -> Base64.getDecoder().decode(encrypted.substring("v2:".length())));
+    }
 
-        // Assert - encrypted should be valid Base64
-        try {
-            java.util.Base64.getDecoder().decode(encrypted);
-            // If we got here, it's valid Base64
-            assertTrue(true);
-        } catch (IllegalArgumentException e) {
-            fail("Encrypted string is not valid Base64: " + e.getMessage());
-        }
+    @ParameterizedTest
+    @DisplayName("Keys of 16, 24 and 32 bytes are accepted")
+    @ValueSource(strings = {"1234567890123456", "123456789012345678901234", "12345678901234567890123456789012"})
+    void testValidKeyLengthsAreAccepted(String key) {
+        CryptoUtil util = new CryptoUtil();
+
+        assertDoesNotThrow(() -> util.setSecretKey(key));
+        assertEquals("ok", CryptoUtil.decrypt(CryptoUtil.encrypt("ok")));
+    }
+
+    @ParameterizedTest
+    @DisplayName("Keys of any other length are rejected at startup with a clear message")
+    @ValueSource(strings = {"", "short", "12345678901234567", "this-key-is-way-too-long-for-aes-at-all"})
+    void testInvalidKeyLengthsAreRejected(String key) {
+        CryptoUtil util = new CryptoUtil();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> util.setSecretKey(key));
+        assertTrue(ex.getMessage().contains("TOKEN_ENCRYPTION_KEY"));
+    }
+
+    @Test
+    @DisplayName("A null key is rejected at startup")
+    void testNullKeyIsRejected() {
+        assertThrows(IllegalStateException.class, () -> new CryptoUtil().setSecretKey(null));
     }
 }
