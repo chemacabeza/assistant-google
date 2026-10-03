@@ -5,9 +5,11 @@ import {
   ChevronDown, Grid, List, MoreVertical, Users 
 } from 'lucide-react';
 import { api } from '../api/axios';
+import { useAuthStore } from '../store/useAuthStore';
 import { Link } from 'react-router-dom';
 
 const Photos = () => {
+  const { user } = useAuthStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEmail, setSelectedEmail] = useState('');
 
@@ -158,7 +160,7 @@ const Photos = () => {
                   <option key={acc.id} value={acc.email}>{acc.email}</option>
                 ))
               ) : (
-                <option value="chema@chemacabeza.dev">chema@chemacabeza.dev</option>
+                <option value={user?.email || ''}>{user?.email || 'No linked accounts'}</option>
               )}
             </select>
           </div>

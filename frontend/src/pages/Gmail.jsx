@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Mail, Edit3, Search, RefreshCw, X, Send } from 'lucide-react';
 import { api } from '../api/axios';
+import { useAuthStore } from '../store/useAuthStore';
 
 const Gmail = () => {
+  const { user } = useAuthStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [isComposing, setIsComposing] = useState(false);
   const [draft, setDraft] = useState({ from: '', to: '', subject: '', body: '' });
@@ -173,7 +175,7 @@ const Gmail = () => {
                          <option key={acc.id} value={acc.email}>{acc.email}</option>
                        ))
                      ) : (
-                       <option value="chema@chemacabeza.dev">chema@chemacabeza.dev</option>
+                       <option value={user?.email || ''}>{user?.email || 'No linked accounts'}</option>
                      )}
                    </select>
                 </div>

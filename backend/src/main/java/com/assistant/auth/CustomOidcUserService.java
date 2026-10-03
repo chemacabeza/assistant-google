@@ -4,6 +4,7 @@ import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import com.assistant.account.LinkedAccountService;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -12,9 +13,11 @@ import java.util.Optional;
 public class CustomOidcUserService extends OidcUserService {
 
     private final UserRepository userRepository;
+    private final LinkedAccountService linkedAccountService;
 
-    public CustomOidcUserService(UserRepository userRepository) {
+    public CustomOidcUserService(UserRepository userRepository, LinkedAccountService linkedAccountService) {
         this.userRepository = userRepository;
+        this.linkedAccountService = linkedAccountService;
     }
 
     @Override
@@ -33,6 +36,7 @@ public class CustomOidcUserService extends OidcUserService {
                 newUser.setName(name != null ? name : email);
                 newUser.setPicture(picture);
                 userRepository.save(newUser);
+                linkedAccountService.ensureLinked(email, name);
             } else {
                 User user = existingUser.get();
                 boolean update = false;

@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FileText, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../api/axios';
+import { useAuthStore } from '../store/useAuthStore';
 
 const Templates = () => {
+  const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showContactsDropdown, setShowContactsDropdown] = useState(false);
@@ -157,7 +159,7 @@ const Templates = () => {
                           <option key={acc.id} value={acc.email}>{acc.email}</option>
                         ))
                       ) : (
-                        <option value="chema@chemacabeza.dev">chema@chemacabeza.dev</option>
+                        <option value={user?.email || ''}>{user?.email || 'No linked accounts'}</option>
                       )}
                     </select>
                   </div>

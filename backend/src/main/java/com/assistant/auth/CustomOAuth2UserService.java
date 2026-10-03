@@ -4,6 +4,7 @@ import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserServ
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import com.assistant.account.LinkedAccountService;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -12,9 +13,11 @@ import java.util.Optional;
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
+    private final LinkedAccountService linkedAccountService;
 
-    public CustomOAuth2UserService(UserRepository userRepository) {
+    public CustomOAuth2UserService(UserRepository userRepository, LinkedAccountService linkedAccountService) {
         this.userRepository = userRepository;
+        this.linkedAccountService = linkedAccountService;
     }
 
     @Override
@@ -33,6 +36,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 newUser.setName(name != null ? name : email);
                 newUser.setPicture(picture);
                 userRepository.save(newUser);
+                linkedAccountService.ensureLinked(email, name);
             } else {
                 User user = existingUser.get();
                 boolean update = false;

@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Calendar as CalendarIcon, MapPin, Clock, Plus, X } from 'lucide-react';
 import { api } from '../api/axios';
+import { useAuthStore } from '../store/useAuthStore';
 
 const Calendar = () => {
+  const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
   const [eventData, setEventData] = useState({ summary: '', description: '', startDate: '', startTime: '', endDate: '', endTime: '' });
@@ -113,7 +115,7 @@ const Calendar = () => {
                             `DTEND:${dtend}`,
                             `SUMMARY:${event.summary || 'Meeting'}`,
                             `LOCATION:${event.location || ''}`,
-                            `ORGANIZER;CN=chemacabeza:mailto:chemacabeza@gmail.com`,
+                            `ORGANIZER;CN=${user?.name || user?.email || ''}:mailto:${user?.email || ''}`,
                             `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${targetEmail}`,
                             "CLASS:PUBLIC",
                             "STATUS:CONFIRMED",

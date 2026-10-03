@@ -7,9 +7,11 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { api } from '../api/axios';
+import { useAuthStore } from '../store/useAuthStore';
 import { Link } from 'react-router-dom';
 
 const Drive = () => {
+  const { user } = useAuthStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEmail, setSelectedEmail] = useState('');
   const [folderPath, setFolderPath] = useState([{ id: 'root', name: 'My Drive' }]);
@@ -204,7 +206,7 @@ const Drive = () => {
                   <option key={acc.id} value={acc.email}>{acc.email}</option>
                 ))
               ) : (
-                <option value="chema@chemacabeza.dev">chema@chemacabeza.dev</option>
+                <option value={user?.email || ''}>{user?.email || 'No linked accounts'}</option>
               )}
             </select>
           </div>

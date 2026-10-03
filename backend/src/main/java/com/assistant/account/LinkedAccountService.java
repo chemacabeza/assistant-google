@@ -1,7 +1,6 @@
 package com.assistant.account;
 
 import org.springframework.stereotype.Service;
-import jakarta.annotation.PostConstruct;
 
 import java.util.List;
 
@@ -14,14 +13,15 @@ public class LinkedAccountService {
         this.repository = repository;
     }
 
-    @PostConstruct
-    public void seedInitialAccounts() {
-        if (repository.count() == 0) {
-            repository.save(new LinkedAccount("chema@chemacabeza.dev", "Primary Account"));
-            repository.save(new LinkedAccount("the.engineering.corner.314@gmail.com", "Engineering Corner"));
-            repository.save(new LinkedAccount("raymondreddington600@gmail.com", "Alt Account"));
-            repository.save(new LinkedAccount("chemacabeza@gmail.com", "Personal Account"));
+    /**
+     * Registers the signed-in Google account as a linked account the first time it is seen,
+     * so the "From" selectors have a sensible default without any hard-coded addresses.
+     */
+    public void ensureLinked(String email, String name) {
+        if (email == null || email.isBlank() || repository.existsByEmail(email)) {
+            return;
         }
+        repository.save(new LinkedAccount(email, name != null && !name.isBlank() ? name : email));
     }
 
     public List<LinkedAccount> getAllAccounts() {
