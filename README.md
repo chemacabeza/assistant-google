@@ -8,10 +8,24 @@ A production-ready full-stack application connecting securely to your Google Acc
 
 ## Architecture & Tech Stack
 
-*   **Backend:** Spring Boot 3.4.3 (Java 21 source compliance), Spring Security OAuth2 Client, Spring WebFlux/WebClient.
-*   **Frontend:** React 18, Vite, Tailwind CSS, React Query, Zustand.
-*   **Database:** PostgreSQL 16 (handled via Docker Compose).
-*   **Containerization:** Fully dockerized (backend on Eclipse Temurin alpine, frontend on Nginx, postgres DB).
+*   **Backend:** Spring Boot 3.5 on Java 25, Spring Security OAuth2 Client, Spring WebFlux/WebClient, Spring Data JPA.
+*   **Frontend:** React 18, Vite, Tailwind CSS, React Query, Zustand, served by Nginx in production.
+*   **WhatsApp bridge:** Node 20 service built on [Baileys](https://github.com/WhiskeySockets/Baileys) (direct WhatsApp multi-device protocol, no Puppeteer).
+*   **Database:** PostgreSQL 16.
+*   **Containerization:** Every service is a self-contained multi-stage Docker build; only Docker is needed on the host.
+*   **Tests:** JUnit 5 + Mockito unit tests for the backend, ESLint for the frontend, and a Playwright end-to-end suite that runs the whole stack against a mock Google OAuth2 provider.
+
+## Repository Layout
+
+| Path | What lives there |
+| :--- | :--- |
+| `backend/` | Spring Boot API: OAuth2 login, Google integrations, assistant routing, WhatsApp ingest, scheduled emails |
+| `frontend/` | React single-page app (Dashboard, Assistant, Gmail, Calendar, Drive, Photos, Maps, WhatsApp, Templates, Configuration) |
+| `whatsapp-bridge/` | Node service that links a WhatsApp account by QR code and pushes chats/messages to the backend |
+| `e2e/` | Playwright suite, mock Google OIDC provider and the isolated `docker-compose.e2e.yml` override |
+| `docker-compose.yml`, `build.sh`, `start.sh`, `stop.sh`, `restart.sh` | Production-style stack and its lifecycle scripts |
+| `.env.example` | Every environment variable the stack reads, with comments |
+| `.github/workflows/ci.yml` | CI: backend tests, frontend lint/build, bridge syntax check, full e2e run |
 
 ## Required APIs
 
@@ -96,37 +110,42 @@ The application requires a secure OAuth 2.0 Web Client integrated with your Goog
 Create a `.env` file in the repository root (copy the `.env.example` file provided). Docker Compose reads it automatically, the backend loads it when run outside Docker, and the **Configuration** page in the UI edits the same file:
 
 ```env
-POSTGRES_USER=assistant_user
-POSTGRES_PASSWORD=assistant_password
-POSTGRES_DB=assistant_db
-SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/assistant_db
-
+# Required
 GOOGLE_CLIENT_ID=your_client_id_here
 GOOGLE_CLIENT_SECRET=your_client_secret_here
-
-OPENAI_API_KEY=your_openai_api_key_here
-
-# 256-bit AES encryption key for database token resting
+# 16, 24 or 32 characters; encrypts Google tokens at rest (openssl rand -hex 16)
 TOKEN_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef
+
+# Optional integrations (leave empty to disable the feature)
+OPENAI_API_KEY=
+VITE_GOOGLE_MAPS_API_KEY=
+TELEGRAM_BOT_TOKEN=
 ```
 
-### 3. Local Development Run
+`.env.example` lists and documents every other variable (database credentials, `APP_FRONTEND_URL`, WhatsApp settings).
 
-**Option A: Automated Scripts (Recommended)**
-We provide three bash scripts to manage the fully dockerised application lifecycles from the root directory:
-1.  **Build** the container architecture: `./build.sh`
-2.  **Start** the stack (runs detached, attaches to log tails): `./start.sh` (Press `Ctrl+C` to quit logs without stopping containers)
-3.  **Stop** the instances cleanly (while preserving database content): `./stop.sh`
+### 3. Running the Stack
 
-Once the stack is started, access your live deployment via `http://localhost:5173`.
+**Option A: Docker (Recommended)**
+Three scripts in the repository root manage the fully dockerised stack:
+1.  **Build** the images: `./build.sh` (only Docker is required on the host)
+2.  **Start** the stack detached and tail the logs: `./start.sh` (`Ctrl+C` leaves the containers running)
+3.  **Stop** the containers while keeping the database volume: `./stop.sh`
 
-**Option B: Independent Development Mode**
-1. Start only the robust PostgreSQL database: `docker compose up db -d`
-2. Run backend manually via Maven wrapper: `cd backend && ./mvnw spring-boot:run`
-3. Run frontend Vite server: `cd frontend && npm run dev`
-4. Access `http://localhost:5173`. The Vite proxy will securely map `/api` and `/login` HTTP transactions dynamically.
+| Service | URL on the host |
+| :--- | :--- |
+| Web UI (Nginx, proxies `/api` to the backend) | `http://localhost:5173` |
+| Backend API | `http://127.0.0.1:8081` |
+| PostgreSQL | `127.0.0.1:5433` |
+| WhatsApp bridge | `http://127.0.0.1:3001` |
 
-### 3. Native WhatsApp Bridge Configuration
+**Option B: Backend and frontend on the host (hot reload)**
+1. Start only PostgreSQL: `docker compose up db -d` (published on port `5433`, which the default `SPRING_DATASOURCE_URL` in `.env.example` already uses).
+2. Start the backend: `cd backend && ./mvnw spring-boot:run`. It reads the repo-root `.env`. If you also want the WhatsApp bridge, start it with `docker compose up whatsapp-bridge -d` and set `BRIDGE_URL=http://localhost:3001` in `.env`.
+3. Start the frontend: `cd frontend && npm install && npm run dev`.
+4. Open `http://localhost:5173`. The Vite dev server proxies `/api`, `/oauth2` and `/login` to the backend on port 8080.
+
+### 4. Native WhatsApp Bridge Configuration
 
 The application features a built-in WhatsApp bridge that connects directly to the WhatsApp protocol (multi-device) via the [Baileys](https://github.com/WhiskeySockets/Baileys) library. This allows you to "link" your own personal WhatsApp account by simply scanning a QR code, exactly like WhatsApp Web.
 
@@ -152,12 +171,25 @@ The application features a built-in WhatsApp bridge that connects directly to th
     *   The AI Assistant can now natively send messages through your linked account. You can ask: *"Send a WhatsApp to Carlos saying I'm running late."*
 
 
+## Testing
+
+| What | Command | Notes |
+| :--- | :--- | :--- |
+| Backend unit tests | `cd backend && ./mvnw test` | JUnit 5 + Mockito, no database needed |
+| Frontend lint and build | `cd frontend && npm ci && npm run lint && npm run build` | ESLint must report zero errors |
+| Bridge syntax check | `cd whatsapp-bridge && npm ci && node --check index.js` | |
+| End-to-end suite | `e2e/run.sh` | Needs Docker and Node 20+. Builds an isolated stack (own compose project, volumes and ports, a mock Google OIDC provider) and runs Playwright against the real backend, database, bridge and UI. Your normal stack and data are never touched. `e2e/run.sh --project=backend` runs one area; `E2E_KEEP_STACK=1` leaves the stack up for debugging. |
+
+The GitHub Actions workflow in `.github/workflows/ci.yml` runs all four on every push to `master` and on pull requests. Dependabot keeps Maven, npm, Docker base images and the Actions up to date.
+
 ## Security & Privacy Considerations
 
 1. **Frontend Isolation**: Client Secrets and refresh tokens are *never* transmitted to the frontend. The React client identifies via an `HTTPOnly` session cookie issued by Spring Security (`JSESSIONID`).
-2. **Encrypted Tokens**: Access Tokens and Refresh Tokens extracted from Google are securely encrypted at rest inside PostgreSQL using transparent JPA `AttributeConverter` utilizing AES.
+2. **Encrypted Tokens**: Google access and refresh tokens are encrypted at rest in PostgreSQL with AES-GCM (random IV, authenticated) through a transparent JPA `AttributeConverter`. Set a real `TOKEN_ENCRYPTION_KEY`; the backend refuses to start with a key of the wrong length.
 3. **WebClient Hooks**: The REST Google integrations (`GmailService`, `CalendarService`) are completely decoupled from token refreshing. Spring Security's `ServletOAuth2AuthorizedClientExchangeFilterFunction` manages background refresh procedures automatically.
 4. **Audit Logs**: Mutating APIs (like `.sendEmail()` or `.createEvent()`) are transparently logged using Spring AOP (`@Auditable`).
+5. **Error responses**: API errors are returned as `{status, message, timestamp}`. Client mistakes get a 4xx, upstream failures (Google, OpenAI, the bridge) a 502, and anything unexpected a 500 with a generic message; stack traces and upstream bodies stay in the server logs.
+6. **CSRF**: State-changing requests must echo the `XSRF-TOKEN` cookie in the `X-XSRF-TOKEN` header. Only the bridge ingest endpoints and the Meta webhook are exempt.
 
-## Notes for LLM Integration
-The `AssistantRoutingService` acts as an entry intent engine parsing basic commands ("Show next meetings"). You can substitute the `parseIntent` implementation there with an SDK call to OpenAI or Google Gemini Function Calling models directly on the backend to yield JSON output which maps perfectly into the pre-built `AssistantController`.
+## How the Assistant Works
+`AssistantRoutingService` sends the conversation to OpenAI (`gpt-4o-mini`) with a set of function-calling tools backed by the Google and WhatsApp services: `fetch_recent_emails`, `fetch_upcoming_meetings`, `calculate_travel_duration`, `schedule_calendar_event`, `delete_calendar_event`, `search_google_contacts`, `send_email` and `send_whatsapp_message`. Tool calls are executed on the backend and their results fed back to the model until it produces a final answer. Rate-limit responses are retried with exponential backoff. To use another provider or model, change the request in `callOpenAiWithRetry` and the `model` field in `callOpenAiWithTools`; the tool definitions and executors are provider-agnostic JSON. The same service answers Telegram messages when `TELEGRAM_BOT_TOKEN` is set.
