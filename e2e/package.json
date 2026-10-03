@@ -1,0 +1,17 @@
+{
+  "name": "assistant-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "End-to-end tests for the backend, frontend and whatsapp-bridge",
+  "scripts": {
+    "test": "playwright test",
+    "test:backend": "playwright test --project=backend",
+    "test:bridge": "playwright test --project=bridge",
+    "test:frontend": "playwright test --project=frontend",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "~1.60.0",
+    "socket.io-client": "^4.7.4"
+  }
+}

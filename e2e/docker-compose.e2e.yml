@@ -1,0 +1,55 @@
+# Overrides docker-compose.yml to run an isolated stack for the e2e suite:
+# own project/containers/volumes, own ports, a mock Google OIDC provider, throwaway .env.
+# Usage: see e2e/run.sh
+services:
+  db:
+    container_name: assistant-e2e-postgres
+    ports: !reset []
+
+  google-mock:
+    build:
+      context: ./e2e/mock-google
+    container_name: assistant-e2e-google-mock
+    environment:
+      - CLIENT_ID=e2e-client-id
+      - CLIENT_SECRET=e2e-client-secret
+    ports:
+      - "127.0.0.1:19000:9000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:9000/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    container_name: assistant-e2e-backend
+    ports: !override
+      - "127.0.0.1:18081:8080"
+    environment:
+      - GOOGLE_CLIENT_ID=e2e-client-id
+      - GOOGLE_CLIENT_SECRET=e2e-client-secret
+      - OPENAI_API_KEY=e2e-unused
+      - VITE_GOOGLE_MAPS_API_KEY=e2e-unused
+      # app.frontend-url is bound from APP_FRONTENDURL (APP_FRONTEND_URL does not match the property)
+      - APP_FRONTENDURL=http://127.0.0.1:15173
+      - APP_OAUTH2_REDIRECT_URI=http://127.0.0.1:15173/login/oauth2/code/google
+      # The browser reaches the mock on the published port; the backend reaches it on the compose network.
+      - SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_GOOGLE_AUTHORIZATION_URI=http://127.0.0.1:19000/o/oauth2/v2/auth
+      - SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_GOOGLE_TOKEN_URI=http://google-mock:9000/token
+      - SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_GOOGLE_USER_INFO_URI=http://google-mock:9000/userinfo
+      - SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_GOOGLE_JWK_SET_URI=http://google-mock:9000/jwks
+    volumes: !override
+      - ./e2e/fixtures/e2e.env:/app/.env
+    depends_on:
+      google-mock:
+        condition: service_healthy
+
+  frontend:
+    container_name: assistant-e2e-frontend
+    ports: !override
+      - "127.0.0.1:15173:80"
+
+  whatsapp-bridge:
+    container_name: assistant-e2e-whatsapp-bridge
+    ports: !override
+      - "127.0.0.1:13001:3001"
