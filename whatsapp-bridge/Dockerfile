@@ -1,5 +1,5 @@
 # ── Dependencies stage ────────────────────────────────────────────────────────────────────────────────
-FROM node:20-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 
 # Some Baileys dependencies are fetched from git
@@ -9,7 +9,7 @@ COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 
 # ── Runtime stage ──────────────────────────────────────────────────────────────────────────────
-FROM node:20-alpine
+FROM node:26-alpine
 
 RUN apk add --no-cache dumb-init
 
