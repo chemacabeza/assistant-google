@@ -329,7 +329,6 @@ public class WhatsAppBridgeController {
      */
     @PostMapping("/bridge/clear-all")
     public ResponseEntity<Void> clearAllData() {
-        // System.out.println("[Backend] ☢️ Nuclear Clear: Wiping all WhatsApp messages and chats...");
         messageRepository.deleteAll();
         chatRepository.deleteAll();
         return ResponseEntity.ok().build();
@@ -366,7 +365,6 @@ public class WhatsAppBridgeController {
 
     @PostMapping("/bridge/logout")
     public ResponseEntity<Map<String, Object>> proxyLogout() {
-        // System.out.println("[Backend] 🔴 Logout proxy requested");
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> result = webClient.post()
@@ -390,7 +388,6 @@ public class WhatsAppBridgeController {
 
     @PostMapping("/bridge/reset")
     public ResponseEntity<Map<String, Object>> proxyReset() {
-        // System.out.println("[Backend] ☢️ Hard Reset proxy requested");
         try {
             // Wipe backend DB first (bridge may not reach /clear-all if it exits)
             messageRepository.deleteAll();

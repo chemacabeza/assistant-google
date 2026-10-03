@@ -7,12 +7,16 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
 
 @Service
 public class TelegramPollingService {
+
+    private static final Logger log = LoggerFactory.getLogger(TelegramPollingService.class);
 
     @Value("${TELEGRAM_BOT_TOKEN:}")
     private String botToken;
@@ -61,7 +65,6 @@ public class TelegramPollingService {
                         
                         if (message.has("text")) {
                             String text = message.get("text").asText();
-                            // System.out.println("Received Telegram message: " + text);
 
                             // Send "Processing..." or just handle it
                             // Route to Assistant
@@ -75,7 +78,7 @@ public class TelegramPollingService {
                 }
             }
         } catch (Exception e) {
-            // System.err.println("Telegram Polling Error: " + e.getMessage());
+            log.warn("Telegram polling failed: {}", e.toString());
         }
     }
 }

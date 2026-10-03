@@ -4,11 +4,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
 @Service
 public class WhatsAppService {
+
+    private static final Logger log = LoggerFactory.getLogger(WhatsAppService.class);
 
     @Value("${BRIDGE_URL:http://whatsapp-bridge:3001}")
     private String bridgeUrl;
@@ -38,7 +42,7 @@ public class WhatsAppService {
 
             return result != null ? result : Map.of("success", true);
         } catch (Exception e) {
-            // System.err.println("WhatsApp Bridge error: " + e.getMessage());
+            log.warn("WhatsApp bridge send to {} failed: {}", to, e.toString());
             return Map.of("success", false, "error", e.getMessage());
         }
     }

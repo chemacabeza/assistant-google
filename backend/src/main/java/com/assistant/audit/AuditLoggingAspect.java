@@ -8,12 +8,16 @@ import org.aspectj.lang.annotation.Aspect;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 
 @Aspect
 @Component
 public class AuditLoggingAspect {
+
+    private static final Logger log = LoggerFactory.getLogger(AuditLoggingAspect.class);
 
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
@@ -42,7 +46,8 @@ public class AuditLoggingAspect {
                 auditLogRepository.save(logEntry);
             }
         } catch (Exception e) {
-            // System.err.println("Failed to save audit log for action: " + auditable.actionType() + " " + e);
+            // Auditing must never break the audited operation.
+            log.warn("Failed to save audit log for action {}: {}", auditable.actionType(), e.toString());
         }
     }
 }

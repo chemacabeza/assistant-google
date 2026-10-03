@@ -3,11 +3,15 @@ package com.assistant.maps;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
 @Service
 public class MapsService {
+
+    private static final Logger log = LoggerFactory.getLogger(MapsService.class);
     @Value("${VITE_GOOGLE_MAPS_API_KEY:}")
     private String mapsApiKey;
 
@@ -40,7 +44,7 @@ public class MapsService {
                 .bodyToMono(Map.class)
                 .block();
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn("Distance Matrix request failed for {} -> {}: {}", origin, destination, e.toString());
             return Map.of("error", "Failed to interface with Maps Platform: " + e.getMessage());
         }
     }

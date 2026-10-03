@@ -41,7 +41,7 @@ public class CustomOAuth2AuthorizedClientService implements OAuth2AuthorizedClie
                 tokenEntity.getAccessToken(),
                 null, // Issued at (not crucial for simple load)
                 tokenEntity.getExpiresAt(),
-                new HashSet<>(Arrays.asList(tokenEntity.getScope().split(",")))
+                tokenEntity.getScope() != null ? new HashSet<>(Arrays.asList(tokenEntity.getScope().split(","))) : null
         );
 
         OAuth2RefreshToken refreshToken = null;

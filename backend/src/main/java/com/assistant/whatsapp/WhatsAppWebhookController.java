@@ -5,10 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/whatsapp/webhook")
 public class WhatsAppWebhookController {
+
+    private static final Logger log = LoggerFactory.getLogger(WhatsAppWebhookController.class);
 
     @Value("${WHATSAPP_VERIFY_TOKEN:chema_assistant_2026}")
     private String verifyToken;
@@ -31,7 +35,7 @@ public class WhatsAppWebhookController {
             @RequestParam("hub.challenge") String challenge) {
 
         if ("subscribe".equals(mode) && verifyToken.equals(token)) {
-            // System.out.println("WhatsApp Webhook Verified!");
+            log.info("WhatsApp webhook verified");
             return ResponseEntity.ok(challenge);
         } else {
             return ResponseEntity.status(403).build();
@@ -85,7 +89,6 @@ public class WhatsAppWebhookController {
                                             messageSid
                                         );
                                         repository.save(waMsg);
-                                        // System.out.println("Saved incoming WhatsApp message from " + profileName);
                                     }
                                 }
                             }
@@ -94,7 +97,8 @@ public class WhatsAppWebhookController {
                 }
             }
         } catch (Exception e) {
-            // System.err.println("Error parsing WhatsApp webhook: " + e.getMessage());
+            // Meta retries on non-2xx, so acknowledge and log instead of failing the delivery.
+            log.warn("Could not parse WhatsApp webhook payload: {}", e.toString());
         }
         return ResponseEntity.ok().build();
     }

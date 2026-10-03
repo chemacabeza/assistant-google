@@ -2,7 +2,9 @@ package com.assistant.templates;
 
 import com.assistant.auth.User;
 import com.assistant.auth.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -18,7 +20,7 @@ public class TemplateService {
 
     public CustomAnswerTemplate createTemplate(String email, CustomAnswerTemplate templateData) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         
         templateData.setUser(user);
         return templateRepository.save(templateData);
@@ -26,10 +28,10 @@ public class TemplateService {
 
     public CustomAnswerTemplate updateTemplate(String email, Long id, CustomAnswerTemplate updatedData) {
         CustomAnswerTemplate existing = templateRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Template not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found"));
 
         if (!existing.getUser().getEmail().equals(email)) {
-            throw new RuntimeException("Unauthorized to update this template");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not allowed to update this template");
         }
 
         existing.setTitle(updatedData.getTitle());
@@ -47,10 +49,10 @@ public class TemplateService {
 
     public void deleteTemplate(String email, Long id) {
         CustomAnswerTemplate existing = templateRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Template not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found"));
 
         if (!existing.getUser().getEmail().equals(email)) {
-            throw new RuntimeException("Unauthorized to delete this template");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not allowed to delete this template");
         }
 
         templateRepository.delete(existing);

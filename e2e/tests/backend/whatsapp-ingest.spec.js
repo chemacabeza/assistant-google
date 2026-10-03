@@ -49,9 +49,6 @@ test.describe('backend: bridge ingest endpoints + database', () => {
     });
 
     test('malformed JSON is a 400 and does not leak internals', async ({ request }) => {
-      // KNOWN DEFECT: GlobalExceptionHandler maps every exception (including client errors) to 500
-      // and echoes the exception message. Remove test.fail() once it answers 400 without details.
-      test.fail();
       const res = await request.post(`${BRIDGE}/chat`, {
         headers: { 'Content-Type': 'application/json' },
         data: '{ nope',

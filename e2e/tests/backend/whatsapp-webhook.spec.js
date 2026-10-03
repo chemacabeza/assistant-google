@@ -53,9 +53,6 @@ test.describe('backend: WhatsApp webhook (Meta Cloud API) + database', () => {
   });
 
   test('verification handshake without parameters is a client error', async ({ request }) => {
-    // KNOWN DEFECT: GlobalExceptionHandler maps every exception (including a missing request
-    // parameter) to 500. Remove test.fail() once it answers 400.
-    test.fail();
     const res = await request.get(WEBHOOK);
     expect(res.status()).toBe(400);
   });
