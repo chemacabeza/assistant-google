@@ -3,6 +3,7 @@ package com.assistant.assistant;
 import com.assistant.calendar.CalendarService;
 import com.assistant.contacts.ContactsService;
 import com.assistant.gmail.GmailService;
+import com.assistant.gmail.MimeMessageBuilder;
 import com.assistant.maps.MapsService;
 import com.assistant.whatsapp.WhatsAppService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,7 +19,6 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -256,7 +256,7 @@ public class AssistantRoutingService {
             );
             
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Assistant request failed", e);
             return Map.of(
                 "action", "ERROR",
                 "response", "Failed to interface with Autonomous Framework: " + e.getMessage(),
@@ -423,12 +423,7 @@ public class AssistantRoutingService {
                 String subject = (String) args.get("subject");
                 String content = (String) args.get("content");
 
-                String rawMessage = "To: " + String.join(",", toEmails) + "\r\n" +
-                                    "Subject: " + subject + "\r\n\r\n" +
-                                    content;
-
-                String encodedEmail = Base64.getUrlEncoder().encodeToString(rawMessage.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                return gmailService.sendEmail(Map.of("raw", encodedEmail));
+                return gmailService.sendEmail(Map.of("raw", MimeMessageBuilder.buildRaw(null, toEmails, subject, content)));
             } else if ("delete_calendar_event".equals(name)) {
                 String eventId = (String) args.get("eventId");
                 calendarService.deleteEvent(eventId);
@@ -440,7 +435,7 @@ public class AssistantRoutingService {
                 return Map.of("success", true, "message", "WhatsApp message sent to " + to);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Assistant tool '{}' failed", name, e);
             return Map.of("error", "Java Binding Execution Failed: " + e.getMessage());
         }
         return Map.of("error", "Unregistered Internal Tool Name");

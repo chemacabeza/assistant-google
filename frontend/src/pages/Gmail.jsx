@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Mail, Edit3, Search, RefreshCw, X, Send } from 'lucide-react';
 import { api } from '../api/axios';
 
 const Gmail = () => {
-  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isComposing, setIsComposing] = useState(false);
   const [draft, setDraft] = useState({ from: '', to: '', subject: '', body: '' });
@@ -53,17 +52,14 @@ const Gmail = () => {
   });
 
   const sendEmail = useMutation({
-    mutationFn: async (payload) => {
-      const fromHeader = payload.from ? `From: ${payload.from}\r\n` : '';
-      const raw = btoa(
-        fromHeader +
-        `To: ${payload.to}\r\n` +
-        `Subject: ${payload.subject}\r\n\r\n` +
-        `${payload.body}`
-      ).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      
-      return api.post('/api/gmail/send', { raw });
-    },
+    // The backend assembles the RFC 5322 message so UTF-8 subjects and bodies
+    // (accents, emoji, CJK) are encoded correctly; btoa() cannot handle them.
+    mutationFn: async (payload) => api.post('/api/gmail/send', {
+      from: payload.from || undefined,
+      to: payload.to,
+      subject: payload.subject,
+      body: payload.body,
+    }),
     onSuccess: () => {
       setIsComposing(false);
       setDraft(prev => ({ ...prev, to: '', subject: '', body: '' }));

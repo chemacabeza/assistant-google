@@ -1,5 +1,6 @@
 package com.assistant.templates;
 
+import com.assistant.gmail.MimeMessageBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -14,11 +15,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Base64;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Collections;
 
 @Component
 public class ScheduledEmailDispatcher {
@@ -65,18 +63,8 @@ public class ScheduledEmailDispatcher {
 
                 String accessToken = authorizedClient.getAccessToken().getTokenValue();
 
-                // Construct raw email RFC 2822 payload
-                String fromHeader = (task.getFromEmail() != null && !task.getFromEmail().isEmpty()) 
-                                    ? "From: " + task.getFromEmail() + "\r\n" : "";
-                String rawEmail = fromHeader + 
-                                  "To: " + task.getTargetEmail() + "\r\n" +
-                                  "Subject: " + task.getTitle() + "\r\n\r\n" +
-                                  task.getContent();
-                
-                String base64EncodedEmail = Base64.getUrlEncoder().withoutPadding().encodeToString(rawEmail.getBytes());
-
-                Map<String, String> payload = new HashMap<>();
-                payload.put("raw", base64EncodedEmail);
+                Map<String, String> payload = Map.of("raw", MimeMessageBuilder.buildRaw(
+                        task.getFromEmail(), List.of(task.getTargetEmail()), task.getTitle(), task.getContent()));
 
                 webClient.post()
                         .uri(GMAIL_SEND_URL)
