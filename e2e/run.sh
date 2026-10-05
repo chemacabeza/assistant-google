@@ -4,7 +4,7 @@
 # Your normal stack and data are never touched.
 #
 #   e2e/run.sh                         # everything
-#   e2e/run.sh --project=backend       # one area (backend | bridge | frontend | destructive)
+#   e2e/run.sh --project=backend       # one area (backend | bridge | frontend | ui | authenticated | auth-flow | destructive)
 #   E2E_KEEP_STACK=1 e2e/run.sh        # leave the stack running afterwards
 set -euo pipefail
 

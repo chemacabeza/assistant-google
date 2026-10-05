@@ -43,10 +43,17 @@ module.exports = defineConfig({
       use: { ...devices['Desktop Chrome'], baseURL: urls.frontend, storageState: AUTH_FILE },
     },
     {
+      // Every page of the real built SPA with the backend API and the bridge socket mocked by Playwright
+      // (Google/OpenAI-backed features cannot run for real in the stack). See helpers/api-mocks.js.
+      name: 'ui',
+      testDir: './tests/ui',
+      use: { ...devices['Desktop Chrome'], baseURL: urls.frontend },
+    },
+    {
       // Wipes bridge sessions and WhatsApp data, so it must run after everything else.
       name: 'destructive',
       testDir: './tests/destructive',
-      dependencies: ['backend', 'bridge', 'frontend', 'auth-flow', 'authenticated'],
+      dependencies: ['backend', 'bridge', 'frontend', 'auth-flow', 'authenticated', 'ui'],
       use: { baseURL: urls.bridge },
     },
   ],

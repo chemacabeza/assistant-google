@@ -8,6 +8,9 @@
     "test:backend": "playwright test --project=backend",
     "test:bridge": "playwright test --project=bridge",
     "test:frontend": "playwright test --project=frontend",
+    "test:ui": "playwright test --project=ui",
+    "test:authenticated": "playwright test --project=authenticated",
+    "test:auth-flow": "playwright test --project=auth-flow",
     "report": "playwright show-report"
   },
   "devDependencies": {
