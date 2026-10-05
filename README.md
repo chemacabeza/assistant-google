@@ -13,7 +13,7 @@ A production-ready full-stack application connecting securely to your Google Acc
 *   **WhatsApp bridge:** Node 20 service built on [Baileys](https://github.com/WhiskeySockets/Baileys) (direct WhatsApp multi-device protocol, no Puppeteer).
 *   **Database:** PostgreSQL 16.
 *   **Containerization:** Every service is a self-contained multi-stage Docker build; only Docker is needed on the host.
-*   **Tests:** JUnit 5 + Mockito unit tests for the backend, ESLint for the frontend, and a Playwright end-to-end suite that runs the whole stack against a mock Google OAuth2 provider.
+*   **Tests:** JUnit 5 + Mockito unit, `@WebMvcTest` and H2-backed repository/integration tests for the backend, Vitest + React Testing Library + MSW component tests and ESLint for the frontend, and a Playwright end-to-end suite that runs the whole stack against a mock Google OAuth2 provider.
 
 ## Repository Layout
 
@@ -175,12 +175,13 @@ The application features a built-in WhatsApp bridge that connects directly to th
 
 | What | Command | Notes |
 | :--- | :--- | :--- |
-| Backend unit tests | `cd backend && ./mvnw test` | JUnit 5 + Mockito, no database needed |
-| Frontend lint and build | `cd frontend && npm ci && npm run lint && npm run build` | ESLint must report zero errors |
+| Backend tests | `cd backend && ./mvnw test` | Unit tests (JUnit 5 + Mockito), controller and security tests (`@WebMvcTest`), repository tests and a full-context integration test on in-memory H2. No database, Docker or network needed; Google and OpenAI calls are stubbed. Tests marked `@Disabled("BUG: ...")` document known bugs. |
+| Frontend tests | `cd frontend && npm ci && npm test` | Vitest + React Testing Library, with the API mocked by MSW. `npm run test:coverage` writes a report to `frontend/coverage/`, `npm run test:watch` re-runs on change. `it.skip('BUG: ...')` tests document known bugs. |
+| Frontend lint and build | `cd frontend && npm run lint && npm run build` | ESLint must report zero errors |
 | Bridge syntax check | `cd whatsapp-bridge && npm ci && node --check index.js` | |
 | End-to-end suite | `e2e/run.sh` | Needs Docker and Node 20+. Builds an isolated stack (own compose project, volumes and ports, a mock Google OIDC provider) and runs Playwright against the real backend, database, bridge and UI. Your normal stack and data are never touched. `e2e/run.sh --project=backend` runs one area; `E2E_KEEP_STACK=1` leaves the stack up for debugging. |
 
-The GitHub Actions workflow in `.github/workflows/ci.yml` runs all four on every push to `master` and on pull requests. Dependabot keeps Maven, npm, Docker base images and the Actions up to date.
+The GitHub Actions workflow in `.github/workflows/ci.yml` runs all of these on every push to `master` and on pull requests. Dependabot keeps Maven, npm, Docker base images and the Actions up to date.
 
 ## Security & Privacy Considerations
 
