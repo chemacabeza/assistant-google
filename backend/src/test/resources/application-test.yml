@@ -1,0 +1,37 @@
+# Test profile: in-memory H2 (PostgreSQL mode) and dummy credentials.
+#
+# application.yml also imports ../.env, so every value a developer may have there that the
+# code reads directly is pinned here; tests must never pick up real API keys or bot tokens.
+spring:
+  datasource:
+    url: jdbc:h2:mem:assistant_test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-client-id
+            client-secret: test-client-secret
+
+app:
+  encryption-key: test-key-0123456789abcdef-012345
+  frontend-url: http://localhost:5173
+
+GOOGLE_CLIENT_ID: test-client-id
+GOOGLE_CLIENT_SECRET: test-client-secret
+TOKEN_ENCRYPTION_KEY: test-key-0123456789abcdef-012345
+OPENAI_API_KEY: ""
+VITE_GOOGLE_MAPS_API_KEY: ""
+TELEGRAM_BOT_TOKEN: ""
+WHATSAPP_VERIFY_TOKEN: test-verify-token
+# Nothing listens on the discard port, so bridge calls fail fast instead of reaching a real bridge.
+BRIDGE_URL: http://127.0.0.1:9
