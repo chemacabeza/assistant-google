@@ -20,5 +20,22 @@ export default defineConfig({
         changeOrigin: true
       }
     }
-  }
+  },
+  // Vitest (unit/component tests). Test files are never imported by the app, so they are
+  // not part of the production bundle.
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.js'],
+    include: ['src/**/*.test.{js,jsx}'],
+    css: false,
+    unstubGlobals: true,
+    unstubEnvs: true,
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{js,jsx}'],
+      exclude: ['src/test/**', 'src/**/*.test.{js,jsx}', 'src/main.jsx'],
+      reporter: ['text', 'html', 'lcov'],
+    },
+  },
 })
