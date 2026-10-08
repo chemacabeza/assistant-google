@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -29,6 +30,9 @@ public class AssistantRoutingService {
     private static final Logger log = LoggerFactory.getLogger(AssistantRoutingService.class);
     private static final int MAX_RETRIES = 3;
     private static final long RETRY_BASE_DELAY_MS = 2000;
+    private static final List<Integer> DEFAULT_REMINDER_MINUTES = List.of(10, 30);
+    private static final int MAX_REMINDERS = 5;
+    private static final int MAX_REMINDER_MINUTES = 40320;
 
     @Value("${OPENAI_API_KEY:}")
     private String openAiApiKey;
@@ -78,7 +82,7 @@ public class AssistantRoutingService {
         )),
         Map.of("type", "function", "function", Map.of(
             "name", "schedule_calendar_event",
-            "description", "Schedules a new event directly on the user's Google Calendar. For driving/travel events, always use: colorId '11' (red), visibility 'private', and a short description with the route name or street. Reminders are automatically added.",
+            "description", "Schedules a new event directly on the user's Google Calendar. For driving/travel events, always use: colorId '11' (red), visibility 'private', and a short description with the route name or street. Supports recurring events (RRULE) and custom popup reminders; 10 and 30 minute popups are used when no reminders are given.",
             "parameters", Map.of(
                 "type", "object",
                 "properties", new java.util.LinkedHashMap<String, Object>() {{
@@ -91,6 +95,17 @@ public class AssistantRoutingService {
                     put("destinationAddress", Map.of("type", "string", "description", "Ending location for generating a Google Maps route Link (optional)"));
                     put("colorId", Map.of("type", "string", "description", "Google Calendar color ID. Use '11' (red/tomato) for driving/travel events. Other options: '1' lavender, '2' sage, '3' grape, '4' flamingo, '5' banana, '6' tangerine, '7' peacock, '8' graphite, '9' blueberry, '10' basil"));
                     put("visibility", Map.of("type", "string", "description", "Event visibility: 'private' or 'public'. Use 'private' for personal/driving events."));
+                    put("recurrence", Map.of(
+                        "type", "array",
+                        "description", "Optional RFC 5545 recurrence rules for repeating events, e.g. ['RRULE:FREQ=MONTHLY;BYDAY=1WE'] for the first Wednesday of every month or ['RRULE:FREQ=WEEKLY;BYDAY=MO,TH']. startTimeISO/endTimeISO must be the first occurrence.",
+                        "items", Map.of("type", "string")
+                    ));
+                    put("reminderMinutes", Map.of(
+                        "type", "array",
+                        "description", "Optional popup reminders as minutes before the event start (e.g. [30, 60, 90]). Up to 5 values between 0 and 40320. Replaces the default 10 and 30 minute reminders.",
+                        "items", Map.of("type", "integer")
+                    ));
+                    put("timeZone", Map.of("type", "string", "description", "IANA time zone of the event (e.g. 'Europe/Berlin'). Always set it for recurring events so occurrences keep the same local time across daylight-saving changes."));
                     put("attendeeEmails", Map.of(
                         "type", "array", 
                         "description", "A list of exact email addresses to formally invite to the calendar event",
@@ -181,7 +196,7 @@ public class AssistantRoutingService {
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        String prompt = "You are an executive AI assistant. The current server date and time is " + ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) + ". You have direct database access to organize the user's Gmail and Calendar. Formulate your answers mapping exact calendar structures relative to this real-time anchor. Synthesize the raw JSON structures you receive into extremely readable human descriptions. When directed to plan travel, evaluate the precise distance using maps and optionally insert blocker blocks onto the calendar if requested to do so. CRITICAL INSTRUCTION: If the maps API returns an error or REQUEST_DENIED, you MUST autonomously estimate the travel time yourself using your internal geographical knowledge and immediately schedule the requested calendar blocks based on your estimate without asking for the user's permission first. TRAVEL EVENT FORMATTING: When creating travel calendar events, ALWAYS apply these defaults: title format '[Mode] from [Origin] to [Destination]' (e.g., 'Drive from Home to Work', 'Transit from Berlin Hbf to Airport'), visibility 'private', set the description to the destination street name or route name, set location to the destination address, and always include originAddress and destinationAddress for navigation links. COLORS: Use colorId '11' (red) for driving, '9' (peacock/blue) for transit, '2' (sage/green) for walking or bicycling. Reminders (10 min and 30 min popups) are automatically added to all events. NAME RESOLUTION: If the user mentions a person by name (e.g., 'Jennifer Lee Hillestad') and you need their email for a tool, use `search_google_contacts` with that name as the query to find their exact associated email address. "
+        String prompt = "You are an executive AI assistant. The current server date and time is " + ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) + ". You have direct database access to organize the user's Gmail and Calendar. Formulate your answers mapping exact calendar structures relative to this real-time anchor. Synthesize the raw JSON structures you receive into extremely readable human descriptions. When directed to plan travel, evaluate the precise distance using maps and optionally insert blocker blocks onto the calendar if requested to do so. CRITICAL INSTRUCTION: If the maps API returns an error or REQUEST_DENIED, you MUST autonomously estimate the travel time yourself using your internal geographical knowledge and immediately schedule the requested calendar blocks based on your estimate without asking for the user's permission first. TRAVEL EVENT FORMATTING: When creating travel calendar events, ALWAYS apply these defaults: title format '[Mode] from [Origin] to [Destination]' (e.g., 'Drive from Home to Work', 'Transit from Berlin Hbf to Airport'), visibility 'private', set the description to the destination street name or route name, set location to the destination address, and always include originAddress and destinationAddress for navigation links. COLORS: Use colorId '11' (red) for driving, '9' (peacock/blue) for transit, '2' (sage/green) for walking or bicycling. REMINDERS: When the user asks for specific reminders (e.g. '1 hour, 30 minutes and 90 minutes before'), pass them as reminderMinutes (e.g. [60, 30, 90]); otherwise 10 min and 30 min popups are added automatically. RECURRING EVENTS: For anything that repeats (e.g. 'every first Wednesday of the month', 'every Monday'), create ONE event with a recurrence rule (e.g. ['RRULE:FREQ=MONTHLY;BYDAY=1WE']) instead of many separate events, set startTimeISO/endTimeISO to the next upcoming occurrence that matches the rule, and set timeZone. A closing or deadline time such as 'the Kita closes around 16:00' means the event happens at that time. NAME RESOLUTION: If the user mentions a person by name (e.g., 'Jennifer Lee Hillestad') and you need their email for a tool, use `search_google_contacts` with that name as the query to find their exact associated email address. "
             + "MULTI-LEG ROUTING WITH FIXED ARRIVAL TIME — THIS IS CRITICAL: "
             + "When the user says 'I need to arrive at [final destination] at [TIME]', the LAST event's endTime MUST equal [TIME]. "
             + "STEP 1: Calculate ALL leg durations first using calculate_travel_duration with the appropriate mode. "
@@ -366,14 +381,28 @@ public class AssistantRoutingService {
                 String colorId = (String) args.get("colorId");
                 String visibility = (String) args.get("visibility");
 
+                String timeZone = (String) args.get("timeZone");
+                List<String> recurrence = (List<String>) args.get("recurrence");
+                List<Object> reminderMinutes = (List<Object>) args.get("reminderMinutes");
+
                 List<String> attendeeEmails = (List<String>) args.get("attendeeEmails");
                 
                 Map<String, Object> payload = new HashMap<>();
                 payload.put("summary", summary);
                 if (description != null && !description.isEmpty()) payload.put("description", description);
                 if (location != null && !location.isEmpty()) payload.put("location", location);
-                payload.put("start", Map.of("dateTime", start));
-                payload.put("end", Map.of("dateTime", end));
+
+                boolean recurring = recurrence != null && !recurrence.isEmpty();
+                // Google Calendar requires a time zone to expand recurring events
+                if ((timeZone == null || timeZone.isBlank()) && recurring) timeZone = ZoneId.systemDefault().getId();
+                payload.put("start", eventTime(start, timeZone));
+                payload.put("end", eventTime(end, timeZone));
+
+                if (recurring) {
+                    payload.put("recurrence", recurrence.stream()
+                            .map(rule -> rule.matches("^(RRULE|EXRULE|RDATE|EXDATE)[:;].*") ? rule : "RRULE:" + rule)
+                            .toList());
+                }
 
                 // Color (e.g. "11" = red/tomato for driving events)
                 if (colorId != null && !colorId.isEmpty()) payload.put("colorId", colorId);
@@ -381,13 +410,10 @@ public class AssistantRoutingService {
                 // Visibility ("private" or "public")
                 if (visibility != null && !visibility.isEmpty()) payload.put("visibility", visibility);
 
-                // Always add 10-minute and 30-minute popup reminders
+                // Popup reminders requested by the user, or 10-minute and 30-minute ones by default
                 Map<String, Object> reminders = new HashMap<>();
                 reminders.put("useDefault", false);
-                reminders.put("overrides", List.of(
-                    Map.of("method", "popup", "minutes", 10),
-                    Map.of("method", "popup", "minutes", 30)
-                ));
+                reminders.put("overrides", popupReminders(reminderMinutes));
                 payload.put("reminders", reminders);
 
                 // Google Maps / Android Auto Navigation Link
@@ -439,5 +465,40 @@ public class AssistantRoutingService {
             return Map.of("error", "Java Binding Execution Failed: " + e.getMessage());
         }
         return Map.of("error", "Unregistered Internal Tool Name");
+    }
+
+    private static Map<String, Object> eventTime(String dateTime, String timeZone) {
+        if (timeZone == null || timeZone.isBlank()) return Map.of("dateTime", dateTime);
+        return Map.of("dateTime", dateTime, "timeZone", timeZone);
+    }
+
+    /**
+     * Google Calendar accepts at most 5 reminder overrides of 0 to 40320 minutes (4 weeks) each.
+     * Invalid or duplicate values are dropped; without any valid value the 10 and 30 minute defaults apply.
+     */
+    private static List<Map<String, Object>> popupReminders(List<Object> requestedMinutes) {
+        List<Integer> minutes = requestedMinutes == null ? List.of() : requestedMinutes.stream()
+                .map(AssistantRoutingService::toMinutes)
+                .filter(m -> m != null && m >= 0 && m <= MAX_REMINDER_MINUTES)
+                .distinct()
+                .sorted()
+                .limit(MAX_REMINDERS)
+                .toList();
+        if (minutes.isEmpty()) minutes = DEFAULT_REMINDER_MINUTES;
+        return minutes.stream()
+                .map(m -> Map.<String, Object>of("method", "popup", "minutes", m))
+                .toList();
+    }
+
+    private static Integer toMinutes(Object value) {
+        if (value instanceof Number number) return number.intValue();
+        if (value instanceof String text) {
+            try {
+                return Integer.valueOf(text.trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 }

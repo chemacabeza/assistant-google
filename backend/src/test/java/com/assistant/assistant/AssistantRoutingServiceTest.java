@@ -365,6 +365,59 @@ class AssistantRoutingServiceTest {
         }
 
         @Test
+        @DisplayName("schedule_calendar_event creates a monthly recurring event with the requested reminders")
+        @SuppressWarnings("unchecked")
+        void scheduleRecurringEventWithCustomReminders() throws Exception {
+            when(calendarService.createEvent(any())).thenReturn(Map.of("id", "evt-kita"));
+
+            runTool("schedule_calendar_event", Map.of(
+                    "summary", "Kita closes",
+                    "location", "Ackerstraße 76, 13355 Berlin, Germany",
+                    "startTimeISO", "2026-11-04T16:00:00+01:00",
+                    "endTimeISO", "2026-11-04T16:30:00+01:00",
+                    "timeZone", "Europe/Berlin",
+                    "recurrence", List.of("RRULE:FREQ=MONTHLY;BYDAY=1WE"),
+                    "reminderMinutes", List.of(60, 30, 90)));
+
+            ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+            verify(calendarService).createEvent(captor.capture());
+            Map<String, Object> payload = (Map<String, Object>) captor.getValue();
+            assertThat(payload)
+                    .containsEntry("start", Map.of("dateTime", "2026-11-04T16:00:00+01:00", "timeZone", "Europe/Berlin"))
+                    .containsEntry("end", Map.of("dateTime", "2026-11-04T16:30:00+01:00", "timeZone", "Europe/Berlin"))
+                    .containsEntry("recurrence", List.of("RRULE:FREQ=MONTHLY;BYDAY=1WE"));
+            assertThat(payload.get("reminders")).isEqualTo(Map.of("useDefault", false, "overrides", List.of(
+                    Map.of("method", "popup", "minutes", 30),
+                    Map.of("method", "popup", "minutes", 60),
+                    Map.of("method", "popup", "minutes", 90))));
+        }
+
+        @Test
+        @DisplayName("schedule_calendar_event prefixes bare rules, defaults the time zone and sanitises reminders")
+        @SuppressWarnings("unchecked")
+        void scheduleRecurringEventNormalisesInput() throws Exception {
+            when(calendarService.createEvent(any())).thenReturn(Map.of());
+
+            runTool("schedule_calendar_event", Map.of(
+                    "summary", "Standup",
+                    "startTimeISO", "2026-11-02T09:00:00+01:00",
+                    "endTimeISO", "2026-11-02T09:15:00+01:00",
+                    "recurrence", List.of("FREQ=WEEKLY;BYDAY=MO"),
+                    "reminderMinutes", List.of(5, "15", 5, -1, 50000, "soon", 1, 2, 3, 4)));
+
+            ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+            verify(calendarService).createEvent(captor.capture());
+            Map<String, Object> payload = (Map<String, Object>) captor.getValue();
+            assertThat(payload).containsEntry("recurrence", List.of("RRULE:FREQ=WEEKLY;BYDAY=MO"));
+            assertThat((Map<String, Object>) payload.get("start"))
+                    .containsEntry("timeZone", java.time.ZoneId.systemDefault().getId());
+            assertThat(payload.get("reminders")).isEqualTo(Map.of("useDefault", false, "overrides", List.of(
+                    Map.of("method", "popup", "minutes", 1), Map.of("method", "popup", "minutes", 2),
+                    Map.of("method", "popup", "minutes", 3), Map.of("method", "popup", "minutes", 4),
+                    Map.of("method", "popup", "minutes", 5))));
+        }
+
+        @Test
         @DisplayName("schedule_calendar_event without any address adds no description, link or source")
         @SuppressWarnings("unchecked")
         void scheduleCalendarEventNoAddress() throws Exception {
