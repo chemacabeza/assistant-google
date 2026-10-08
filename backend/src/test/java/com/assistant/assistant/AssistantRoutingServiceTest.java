@@ -383,8 +383,8 @@ class AssistantRoutingServiceTest {
             verify(calendarService).createEvent(captor.capture());
             Map<String, Object> payload = (Map<String, Object>) captor.getValue();
             assertThat(payload)
-                    .containsEntry("start", Map.of("dateTime", "2026-11-04T16:00:00+01:00", "timeZone", "Europe/Berlin"))
-                    .containsEntry("end", Map.of("dateTime", "2026-11-04T16:30:00+01:00", "timeZone", "Europe/Berlin"))
+                    .containsEntry("start", Map.of("dateTime", "2026-11-04T16:00:00", "timeZone", "Europe/Berlin"))
+                    .containsEntry("end", Map.of("dateTime", "2026-11-04T16:30:00", "timeZone", "Europe/Berlin"))
                     .containsEntry("recurrence", List.of("RRULE:FREQ=MONTHLY;BYDAY=1WE"));
             assertThat(payload.get("reminders")).isEqualTo(Map.of("useDefault", false, "overrides", List.of(
                     Map.of("method", "popup", "minutes", 30),
@@ -409,12 +409,53 @@ class AssistantRoutingServiceTest {
             verify(calendarService).createEvent(captor.capture());
             Map<String, Object> payload = (Map<String, Object>) captor.getValue();
             assertThat(payload).containsEntry("recurrence", List.of("RRULE:FREQ=WEEKLY;BYDAY=MO"));
-            assertThat((Map<String, Object>) payload.get("start"))
-                    .containsEntry("timeZone", java.time.ZoneId.systemDefault().getId());
+            assertThat(payload).containsEntry("start",
+                    Map.of("dateTime", "2026-11-02T09:00:00", "timeZone", java.time.ZoneId.systemDefault().getId()));
             assertThat(payload.get("reminders")).isEqualTo(Map.of("useDefault", false, "overrides", List.of(
                     Map.of("method", "popup", "minutes", 1), Map.of("method", "popup", "minutes", 2),
                     Map.of("method", "popup", "minutes", 3), Map.of("method", "popup", "minutes", 4),
                     Map.of("method", "popup", "minutes", 5))));
+        }
+
+        @Test
+        @DisplayName("schedule_calendar_event moves a recurring event to its first matching date, local time and default length")
+        @SuppressWarnings("unchecked")
+        void scheduleRecurringEventFixesModelDates() throws Exception {
+            when(calendarService.createEvent(any())).thenReturn(Map.of());
+
+            // What gpt-4o-mini actually sent for the Kita prompt: a Sunday, the summer offset and no duration
+            runTool("schedule_calendar_event", Map.of(
+                    "summary", "Kita closes",
+                    "startTimeISO", "2026-11-01T16:00:00+02:00",
+                    "endTimeISO", "2026-11-01T16:00:00+02:00",
+                    "timeZone", "Europe/Berlin",
+                    "recurrence", List.of("RRULE:FREQ=MONTHLY;BYDAY=1WE")));
+
+            ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+            verify(calendarService).createEvent(captor.capture());
+            assertThat((Map<String, Object>) captor.getValue())
+                    .containsEntry("start", Map.of("dateTime", "2026-11-04T16:00:00", "timeZone", "Europe/Berlin"))
+                    .containsEntry("end", Map.of("dateTime", "2026-11-04T16:30:00", "timeZone", "Europe/Berlin"));
+        }
+
+        @Test
+        @DisplayName("firstOccurrence finds the first date matched by weekly and monthly BYDAY rules")
+        void firstOccurrenceRules() {
+            java.time.LocalDate sunday = java.time.LocalDate.of(2026, 11, 1);
+            assertThat(AssistantRoutingService.firstOccurrence(sunday, List.of("RRULE:FREQ=MONTHLY;BYDAY=1WE")))
+                    .isEqualTo("2026-11-04");
+            assertThat(AssistantRoutingService.firstOccurrence(java.time.LocalDate.of(2026, 10, 8), List.of("RRULE:FREQ=MONTHLY;BYDAY=1WE")))
+                    .isEqualTo("2026-11-04");
+            assertThat(AssistantRoutingService.firstOccurrence(sunday, List.of("RRULE:FREQ=MONTHLY;BYDAY=WE;BYSETPOS=1")))
+                    .isEqualTo("2026-11-04");
+            assertThat(AssistantRoutingService.firstOccurrence(sunday, List.of("RRULE:FREQ=MONTHLY;BYDAY=-1FR")))
+                    .isEqualTo("2026-11-27");
+            assertThat(AssistantRoutingService.firstOccurrence(sunday, List.of("RRULE:FREQ=WEEKLY;BYDAY=TU,TH")))
+                    .isEqualTo("2026-11-03");
+            assertThat(AssistantRoutingService.firstOccurrence(sunday, List.of("RRULE:FREQ=DAILY")))
+                    .isEqualTo(sunday);
+            assertThat(AssistantRoutingService.firstOccurrence(sunday, List.of("RRULE:FREQ=MONTHLY;BYDAY=+WE")))
+                    .isEqualTo(sunday);
         }
 
         @Test

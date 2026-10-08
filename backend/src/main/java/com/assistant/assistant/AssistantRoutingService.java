@@ -16,13 +16,24 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.time.DateTimeException;
+import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class AssistantRoutingService {
@@ -33,6 +44,11 @@ public class AssistantRoutingService {
     private static final List<Integer> DEFAULT_REMINDER_MINUTES = List.of(10, 30);
     private static final int MAX_REMINDERS = 5;
     private static final int MAX_REMINDER_MINUTES = 40320;
+    private static final int DEFAULT_EVENT_MINUTES = 30;
+    private static final Pattern BYDAY_ENTRY = Pattern.compile("((?:[+-]?\\d{1,2})?)(MO|TU|WE|TH|FR|SA|SU)");
+    private static final Map<String, DayOfWeek> WEEKDAYS = Map.of(
+            "MO", DayOfWeek.MONDAY, "TU", DayOfWeek.TUESDAY, "WE", DayOfWeek.WEDNESDAY, "TH", DayOfWeek.THURSDAY,
+            "FR", DayOfWeek.FRIDAY, "SA", DayOfWeek.SATURDAY, "SU", DayOfWeek.SUNDAY);
 
     @Value("${OPENAI_API_KEY:}")
     private String openAiApiKey;
@@ -196,7 +212,7 @@ public class AssistantRoutingService {
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        String prompt = "You are an executive AI assistant. The current server date and time is " + ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) + ". You have direct database access to organize the user's Gmail and Calendar. Formulate your answers mapping exact calendar structures relative to this real-time anchor. Synthesize the raw JSON structures you receive into extremely readable human descriptions. When directed to plan travel, evaluate the precise distance using maps and optionally insert blocker blocks onto the calendar if requested to do so. CRITICAL INSTRUCTION: If the maps API returns an error or REQUEST_DENIED, you MUST autonomously estimate the travel time yourself using your internal geographical knowledge and immediately schedule the requested calendar blocks based on your estimate without asking for the user's permission first. TRAVEL EVENT FORMATTING: When creating travel calendar events, ALWAYS apply these defaults: title format '[Mode] from [Origin] to [Destination]' (e.g., 'Drive from Home to Work', 'Transit from Berlin Hbf to Airport'), visibility 'private', set the description to the destination street name or route name, set location to the destination address, and always include originAddress and destinationAddress for navigation links. COLORS: Use colorId '11' (red) for driving, '9' (peacock/blue) for transit, '2' (sage/green) for walking or bicycling. REMINDERS: When the user asks for specific reminders (e.g. '1 hour, 30 minutes and 90 minutes before'), pass them as reminderMinutes (e.g. [60, 30, 90]); otherwise 10 min and 30 min popups are added automatically. RECURRING EVENTS: For anything that repeats (e.g. 'every first Wednesday of the month', 'every Monday'), create ONE event with a recurrence rule (e.g. ['RRULE:FREQ=MONTHLY;BYDAY=1WE']) instead of many separate events, set startTimeISO/endTimeISO to the next upcoming occurrence that matches the rule, and set timeZone. A closing or deadline time such as 'the Kita closes around 16:00' means the event happens at that time. NAME RESOLUTION: If the user mentions a person by name (e.g., 'Jennifer Lee Hillestad') and you need their email for a tool, use `search_google_contacts` with that name as the query to find their exact associated email address. "
+        String prompt = "You are an executive AI assistant. The current server date and time is " + ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) + " (" + ZonedDateTime.now().getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + "). You have direct database access to organize the user's Gmail and Calendar. Formulate your answers mapping exact calendar structures relative to this real-time anchor. Synthesize the raw JSON structures you receive into extremely readable human descriptions. When directed to plan travel, evaluate the precise distance using maps and optionally insert blocker blocks onto the calendar if requested to do so. CRITICAL INSTRUCTION: If the maps API returns an error or REQUEST_DENIED, you MUST autonomously estimate the travel time yourself using your internal geographical knowledge and immediately schedule the requested calendar blocks based on your estimate without asking for the user's permission first. TRAVEL EVENT FORMATTING: When creating travel calendar events, ALWAYS apply these defaults: title format '[Mode] from [Origin] to [Destination]' (e.g., 'Drive from Home to Work', 'Transit from Berlin Hbf to Airport'), visibility 'private', set the description to the destination street name or route name, set location to the destination address, and always include originAddress and destinationAddress for navigation links. COLORS: Use colorId '11' (red) for driving, '9' (peacock/blue) for transit, '2' (sage/green) for walking or bicycling. REMINDERS: When the user asks for specific reminders (e.g. '1 hour, 30 minutes and 90 minutes before'), pass them as reminderMinutes (e.g. [60, 30, 90]); otherwise 10 min and 30 min popups are added automatically. RECURRING EVENTS: For anything that repeats (e.g. 'every first Wednesday of the month', 'every Monday'), create ONE event with a recurrence rule (e.g. ['RRULE:FREQ=MONTHLY;BYDAY=1WE']) instead of many separate events, set startTimeISO/endTimeISO to the next upcoming occurrence that matches the rule, and set timeZone. A closing or deadline time such as 'the Kita closes around 16:00' means the event happens at that time. endTimeISO must be after startTimeISO; when no duration is given, make the event 30 minutes long. NAME RESOLUTION: If the user mentions a person by name (e.g., 'Jennifer Lee Hillestad') and you need their email for a tool, use `search_google_contacts` with that name as the query to find their exact associated email address. "
             + "MULTI-LEG ROUTING WITH FIXED ARRIVAL TIME — THIS IS CRITICAL: "
             + "When the user says 'I need to arrive at [final destination] at [TIME]', the LAST event's endTime MUST equal [TIME]. "
             + "STEP 1: Calculate ALL leg durations first using calculate_travel_duration with the appropriate mode. "
@@ -395,6 +411,11 @@ public class AssistantRoutingService {
                 boolean recurring = recurrence != null && !recurrence.isEmpty();
                 // Google Calendar requires a time zone to expand recurring events
                 if ((timeZone == null || timeZone.isBlank()) && recurring) timeZone = ZoneId.systemDefault().getId();
+                if (timeZone != null && !timeZone.isBlank()) {
+                    String[] window = wallClockWindow(start, end, recurring ? recurrence : List.of());
+                    start = window[0];
+                    end = window[1];
+                }
                 payload.put("start", eventTime(start, timeZone));
                 payload.put("end", eventTime(end, timeZone));
 
@@ -465,6 +486,75 @@ public class AssistantRoutingService {
             return Map.of("error", "Java Binding Execution Failed: " + e.getMessage());
         }
         return Map.of("error", "Unregistered Internal Tool Name");
+    }
+
+    /**
+     * With an explicit time zone the model's UTC offset is dropped so the event keeps its wall-clock time
+     * (the model often uses the summer offset for winter dates). A recurring event is moved to the first
+     * date its rule matches, since Google Calendar would otherwise add the start date as an extra occurrence,
+     * and an event that does not end after it starts gets the default length.
+     */
+    private static String[] wallClockWindow(String startIso, String endIso, List<String> recurrence) {
+        try {
+            LocalDateTime start = LocalDateTime.from(DateTimeFormatter.ISO_DATE_TIME.parse(startIso));
+            LocalDateTime end = LocalDateTime.from(DateTimeFormatter.ISO_DATE_TIME.parse(endIso));
+            Duration length = Duration.between(start, end);
+            if (length.isNegative() || length.isZero()) length = Duration.ofMinutes(DEFAULT_EVENT_MINUTES);
+            start = firstOccurrence(start.toLocalDate(), recurrence).atTime(start.toLocalTime());
+            return new String[] {start.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                    start.plus(length).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)};
+        } catch (DateTimeException e) {
+            return new String[] {startIso, endIso};
+        }
+    }
+
+    /** First date on or after {@code from} matched by a WEEKLY or MONTHLY BYDAY rule; other rules keep the date. */
+    static LocalDate firstOccurrence(LocalDate from, List<String> recurrence) {
+        for (String rule : recurrence) {
+            if (!rule.startsWith("RRULE:")) continue;
+            Map<String, String> parts = new HashMap<>();
+            for (String part : rule.substring("RRULE:".length()).split(";")) {
+                String[] keyValue = part.split("=", 2);
+                if (keyValue.length == 2) parts.put(keyValue[0].toUpperCase(Locale.ROOT), keyValue[1].toUpperCase(Locale.ROOT));
+            }
+            String byDay = parts.get("BYDAY");
+            if (byDay == null) continue;
+
+            List<Integer> ordinals = new ArrayList<>();
+            List<DayOfWeek> days = new ArrayList<>();
+            for (String entry : byDay.split(",")) {
+                Matcher matcher = BYDAY_ENTRY.matcher(entry.trim());
+                if (!matcher.matches()) return from;
+                ordinals.add(matcher.group(1).isEmpty() ? 0 : Integer.parseInt(matcher.group(1)));
+                days.add(WEEKDAYS.get(matcher.group(2)));
+            }
+
+            if ("WEEKLY".equals(parts.get("FREQ"))) {
+                LocalDate date = from;
+                while (!days.contains(date.getDayOfWeek())) date = date.plusDays(1);
+                return date;
+            }
+            if ("MONTHLY".equals(parts.get("FREQ"))) {
+                // "BYDAY=WE;BYSETPOS=1" is the same as "BYDAY=1WE"
+                String setPos = parts.get("BYSETPOS");
+                if (setPos != null && days.size() == 1 && ordinals.get(0) == 0 && setPos.matches("[+-]?\\d+")) {
+                    ordinals.set(0, Integer.parseInt(setPos));
+                }
+                for (int month = 0; month < 24; month++) {
+                    YearMonth yearMonth = YearMonth.from(from).plusMonths(month);
+                    LocalDate best = null;
+                    for (int i = 0; i < days.size(); i++) {
+                        int ordinal = ordinals.get(i);
+                        if (ordinal == 0) continue; // every weekday of the month is not handled here
+                        LocalDate candidate = yearMonth.atDay(1).with(TemporalAdjusters.dayOfWeekInMonth(ordinal, days.get(i)));
+                        if (YearMonth.from(candidate).equals(yearMonth) && !candidate.isBefore(from)
+                                && (best == null || candidate.isBefore(best))) best = candidate;
+                    }
+                    if (best != null) return best;
+                }
+            }
+        }
+        return from;
     }
 
     private static Map<String, Object> eventTime(String dateTime, String timeZone) {
