@@ -81,6 +81,7 @@ let currentQr    = null;   // base64 data URL for current QR code
 let isConnected  = false;  // true when WA session is open
 let sock         = null;   // Baileys socket instance
 let reconnecting = false;
+let reconnectDelayMs = 3000; // grows while reconnects keep failing, reset once connected
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -241,7 +242,10 @@ async function startBridge() {
     version,
     auth:            state,
     logger,
-    browser:         Browsers.macOS('Desktop'),
+    // Desktop identities (macOS/Windows) make Baileys announce a desktop-app sub-platform,
+    // which WhatsApp now rejects during pairing (status 428, no QR). A web identity still
+    // sends the full-history request.
+    browser:         Browsers.ubuntu('Chrome'),
     syncFullHistory: true,   // request full message history on first connect
     getMessage: async (key) => {
       const stored = await store.loadMessage(key.remoteJid, key.id);
@@ -273,6 +277,7 @@ async function startBridge() {
       currentQr   = null;
       isConnected = true;
       reconnecting = false;
+      reconnectDelayMs = 3000;
       io.emit('ready', { status: 'connected' });
     }
 
@@ -293,11 +298,14 @@ async function startBridge() {
         try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }); } catch {}
         io.emit('disconnected', { reason: 'logged_out' });
         setTimeout(startBridge, 1000);
-      } else if (statusCode !== DisconnectReason.connectionClosed) {
-        // Temporary disconnect — reconnect automatically
-        // console.log('[Bridge] Reconnecting in 3 s...');
+      } else {
+        // Any other close (including 428 connectionClosed) — reconnect with backoff.
+        // /logout and /reset end the process themselves, so they never get here.
+        clearTimeout(watchdog);
+        console.warn(`[Bridge] Connection closed (status ${statusCode ?? 'unknown'}), reconnecting in ${reconnectDelayMs / 1000}s`);
         sock?.ws?.close();
-        setTimeout(startBridge, 3000);
+        setTimeout(startBridge, reconnectDelayMs);
+        reconnectDelayMs = Math.min(reconnectDelayMs * 2, 60000);
       }
     }
   });
