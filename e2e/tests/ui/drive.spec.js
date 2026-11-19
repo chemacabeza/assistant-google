@@ -53,9 +53,7 @@ test.describe('ui: google drive', () => {
     );
   });
 
-  // BUG: Drive.jsx interpolates the search term into the Drive query without escaping, so a
-  // quote ("O'Brien") produces an invalid query and the Drive API answers 400.
-  test.fixme('quotes in the search term are escaped in the Drive query', async ({ page, api }) => {
+  test('quotes in the search term are escaped in the Drive query', async ({ page, api }) => {
     await page.goto('/drive');
     await page.getByPlaceholder('Search in Drive').fill("O'Brien");
     await expect.poll(() => lastQuery(api)).toContain("name contains 'O\\'Brien'");

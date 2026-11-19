@@ -181,9 +181,7 @@ test.describe('ui: custom answers / scheduled emails', () => {
     await expect(page.getByText('No templates yet')).toBeVisible({ timeout: 20_000 });
   });
 
-  // BUG: with no linked accounts the "From" select shows the user's address, but the form state
-  // stays empty, so the template is saved with fromEmail "" instead of the address shown.
-  test.fixme('without linked accounts the template is sent from the signed-in address', async ({ page, api }) => {
+  test('without linked accounts the template is sent from the signed-in address', async ({ page, api }) => {
     api.on('GET', '/api/accounts', { json: [] });
     await page.goto('/templates');
     await page.getByRole('button', { name: 'New Template' }).click();

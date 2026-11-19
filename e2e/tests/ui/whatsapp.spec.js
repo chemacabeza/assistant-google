@@ -153,10 +153,7 @@ test.describe('ui: whatsapp', () => {
     expect(api.callsTo('GET', '/api/whatsapp/chats')).toHaveLength(0);
   });
 
-  // BUG: WhatsApp.jsx passes the axios *response* to URL.createObjectURL() instead of response.data,
-  // which throws (swallowed by .catch), so the QR fetched over REST is never shown; the page only
-  // works if the bridge also pushes the QR over the socket.
-  test.fixme('an unlinked bridge shows the QR code fetched from the backend', async ({ page, api }) => {
+  test('an unlinked bridge shows the QR code fetched from the backend', async ({ page, api }) => {
     api.on('GET', '/api/whatsapp/bridge/status', { json: { authenticated: false, ready: false, hasQr: true } });
     await page.goto('/whatsapp');
     await expect(page.getByRole('heading', { name: 'Link a device to use WhatsApp' })).toBeVisible();

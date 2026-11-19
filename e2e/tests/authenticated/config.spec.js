@@ -90,9 +90,7 @@ test.describe('authenticated: configuration against the real .env', () => {
     expect(envLines()).toEqual(['OPENAI_API_KEY=secret']);
   });
 
-  // BUG: ConfigController writes values verbatim, so a value containing a newline injects
-  // arbitrary extra lines (any variable, e.g. SPRING_DATASOURCE_URL) into the .env.
-  test.fixme('a value with a newline cannot inject extra variables', async ({ request }) => {
+  test('a value with a newline cannot inject extra variables', async ({ request }) => {
     writeEnv('');
     await request.post('/api/config/env', {
       data: { OPENAI_API_KEY: 'sk-x\nSPRING_DATASOURCE_URL=jdbc:postgresql://attacker/db' },

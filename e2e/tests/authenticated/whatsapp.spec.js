@@ -60,9 +60,7 @@ test.describe('authenticated: WhatsApp with an unlinked bridge', () => {
     expect(directBody.subarray(0, 8).toString('hex')).toBe(PNG_SIGNATURE);
   });
 
-  // BUG: while the bridge has no QR yet it answers 202 + JSON; WhatsAppBridgeController.getBridgeQr
-  // treats any 2xx as success and serves that JSON as a 200 "image/png".
-  test.fixme('the QR proxy never labels a non-PNG body as image/png', async ({ request }) => {
+  test('the QR proxy never labels a non-PNG body as image/png', async ({ request }) => {
     const res = await request.get('/api/whatsapp/bridge/qr');
     if (res.status() === 200) {
       expect((await res.body()).subarray(0, 8).toString('hex')).toBe(PNG_SIGNATURE);

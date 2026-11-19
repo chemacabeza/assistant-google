@@ -74,9 +74,7 @@ test.describe('authenticated: linked accounts', () => {
     expect(rows(`select 1 as n from linked_accounts where email = ${lit(email('nocsrf'))}`)).toHaveLength(0);
   });
 
-  // BUG: linked accounts are global (LinkedAccountService.getAllAccounts / deleteAccount ignore the
-  // signed-in user), so every user sees, and can delete, every other user's linked addresses.
-  test.fixme("one user's linked accounts are invisible to another user", async ({ request, browser }) => {
+  test("one user's linked accounts are invisible to another user", async ({ request, browser }) => {
     const address = email('private');
     const created = await request.post('/api/accounts', { data: { email: address, name: 'Private' }, headers: await csrfHeaders(request) });
     expect(created.status()).toBe(200);

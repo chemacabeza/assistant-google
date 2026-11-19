@@ -126,9 +126,7 @@ test.describe('ui: calendar', () => {
     await expect.poll(() => dialogs.map((d) => d.message).join('\n')).toContain('Failed to send invite');
   });
 
-  // BUG: the invite prompt is pre-filled with a hard-coded personal address (Calendar.jsx), so
-  // pressing Enter mails every invite to a stranger. It should start empty.
-  test.fixme('the invite prompt does not suggest a hard-coded recipient', async ({ page, dialogs }) => {
+  test('the invite prompt does not suggest a hard-coded recipient', async ({ page, dialogs }) => {
     dialogs.answer = false;
     await page.goto('/calendar');
     await page.getByRole('button', { name: 'Send Invite' }).first().click();

@@ -57,16 +57,12 @@ test.describe('ui: dashboard', () => {
     await expect(page.getByText('System Dashboard')).toBeVisible();
   });
 
-  // BUG: Gmail API snippets are HTML-escaped ("don&#39;t", "&amp;"). The Gmail page decodes them,
-  // but Dashboard.jsx renders the snippet as plain text, so users see the raw entities.
-  test.fixme('HTML entities in mail snippets are decoded like on the Gmail page', async ({ page }) => {
+  test('HTML entities in mail snippets are decoded like on the Gmail page', async ({ page }) => {
     await page.goto('/dashboard');
     await expect(page.getByText('Quarterly numbers attached & ready for review')).toBeVisible();
   });
 
-  // BUG: Dashboard.jsx fetches calendar and mail inside one try block, so a calendar failure
-  // aborts before the Gmail request is even sent and the inbox panel claims "No recent emails".
-  test.fixme('a calendar outage still shows the inbox', async ({ page, api }) => {
+  test('a calendar outage still shows the inbox', async ({ page, api }) => {
     api.fail('GET', '/api/calendar/events', 500);
     await page.goto('/dashboard');
     await expect(page.getByText('Q3 report')).toBeVisible();

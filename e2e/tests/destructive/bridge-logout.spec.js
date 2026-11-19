@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
-const { urls } = require('../../helpers/env');
+const { urls, AUTH_FILE } = require('../../helpers/env');
+const { csrfHeaders } = require('../../helpers/auth');
 const { rows, lit, psql, runId } = require('../../helpers/db');
 
 // Bridge logout restarts the bridge process, so it lives with the other destructive tests.
@@ -24,7 +25,7 @@ test.describe('WhatsApp bridge logout', () => {
     try {
       res = await request.post('/logout');
     } catch (e) {
-      // See the BUG below: the bridge may crash before answering. It must still come back.
+      // The bridge restarts right after answering; it must come back either way.
       test.info().annotations.push({ type: 'note', description: `logout connection dropped: ${e.message}` });
     }
     if (res) {
@@ -38,17 +39,17 @@ test.describe('WhatsApp bridge logout', () => {
     expect((await (await request.get('/status')).json()).ready).toBe(false);
   });
 
-  // BUG: while Baileys is still opening its WhatsApp socket (e.g. right after a restart, or with no
-  // internet), sock.logout() closes it and ws emits an unhandled 'error' that crashes the bridge
-  // before it answers. The backend proxy then returns 503 and skips its own data wipe.
-  test.fixme('backend logout proxy reliably wipes WhatsApp data and reaches the bridge', async ({ request, playwright }) => {
+  test('backend logout proxy reliably wipes WhatsApp data and reaches the bridge', async ({ request, playwright }) => {
     await waitForBridge(request);
-    const backend = await playwright.request.newContext({ baseURL: urls.backend });
+    const bridgeIngest = await playwright.request.newContext({ baseURL: urls.backend });
     const chatId = `e2e-${runId()}-logout@s.whatsapp.net`;
-    await backend.post('/api/whatsapp/bridge/chat', { data: { chatId, name: 'Logout' } });
+    await bridgeIngest.post('/api/whatsapp/bridge/chat', { data: { chatId, name: 'Logout' } });
+    await bridgeIngest.dispose();
     expect(rows(`select 1 as n from whatsapp_chats where chat_id = ${lit(chatId)}`)).toHaveLength(1);
 
-    const res = await backend.post('/api/whatsapp/bridge/logout');
+    // Logging out is a user action: it needs the signed-in session and the CSRF token.
+    const backend = await playwright.request.newContext({ baseURL: urls.frontend, storageState: AUTH_FILE });
+    const res = await backend.post('/api/whatsapp/bridge/logout', { headers: await csrfHeaders(backend) });
     expect(res.status()).toBe(200);
     expect(rows(`select 1 as n from whatsapp_chats where chat_id = ${lit(chatId)}`)).toHaveLength(0);
 
@@ -58,13 +59,18 @@ test.describe('WhatsApp bridge logout', () => {
     psql(`delete from whatsapp_chats where chat_id = ${lit(chatId)}`);
   });
 
-  // BUG: /api/whatsapp/bridge/** is permitAll and CSRF-exempt so the bridge can push data, but that
-  // also exposes the frontend-only actions /bridge/logout and /bridge/reset (which wipe all
-  // WhatsApp data and unlink the phone) to anonymous callers and cross-site requests.
-  test.fixme('anonymous callers cannot log out or reset the bridge through the backend', async ({ playwright }) => {
+  test('anonymous callers cannot log out or reset the bridge through the backend', async ({ playwright }) => {
     const anon = await playwright.request.newContext({ baseURL: urls.backend });
-    expect((await anon.post('/api/whatsapp/bridge/logout')).status()).toBe(401);
-    expect((await anon.post('/api/whatsapp/bridge/reset')).status()).toBe(401);
+    const startedBefore = (await (await anon.get('/api/whatsapp/bridge/status')).json());
+    for (const path of ['/api/whatsapp/bridge/logout', '/api/whatsapp/bridge/reset']) {
+      // Without the CSRF token the request is refused before the session check...
+      expect((await anon.post(path)).status()).toBe(403);
+      // ...and with a valid token, because nobody is signed in.
+      await anon.get('/api/auth/profile'); // issues the XSRF-TOKEN cookie
+      expect((await anon.post(path, { headers: await csrfHeaders(anon) })).status()).toBe(401);
+    }
+    // Neither call reached the bridge: it did not restart and still answers.
+    expect((await (await anon.get('/api/whatsapp/bridge/status')).json()).ready).toBe(startedBefore.ready);
     await anon.dispose();
   });
 });
