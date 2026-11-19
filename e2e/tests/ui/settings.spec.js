@@ -60,6 +60,8 @@ test.describe('ui: settings', () => {
   test('"Sign Out" logs out and goes to the login page', async ({ page, api }) => {
     api.on('POST', '/api/auth/logout', { status: 200, json: {}, delay: 500 });
     await page.goto('/settings');
+    await expect(page.getByRole('button', { name: 'Sign Out' })).toBeVisible();
+    api.on('GET', '/api/auth/profile', { status: 401, json: {} }); // the session is gone after the reload
     const logout = api.waitForCall('POST', '/api/auth/logout');
     await page.getByRole('button', { name: 'Sign Out' }).click();
     await expect(page.getByRole('button', { name: 'Signing out...' })).toBeDisabled();
@@ -71,6 +73,8 @@ test.describe('ui: settings', () => {
   test('"Sign Out" still leaves when the logout call fails', async ({ page, api }) => {
     api.fail('POST', '/api/auth/logout', 500);
     await page.goto('/settings');
+    await expect(page.getByRole('button', { name: 'Sign Out' })).toBeVisible();
+    api.on('GET', '/api/auth/profile', { status: 401, json: {} });
     await page.getByRole('button', { name: 'Sign Out' }).click();
     await expect(page).toHaveURL(/\/login$/);
   });

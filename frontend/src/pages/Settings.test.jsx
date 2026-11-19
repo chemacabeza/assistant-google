@@ -91,7 +91,7 @@ describe('Settings page', () => {
   });
 
   it('signs out: calls the logout endpoint and leaves the page', async () => {
-    mockLocation();
+    const { assign } = mockLocation();
     let logoutCalls = 0;
     server.use(http.post('/api/auth/logout', () => {
       logoutCalls += 1;
@@ -102,15 +102,10 @@ describe('Settings page', () => {
     await user.click(within(section).getByRole('button', { name: /sign out/i }));
 
     await waitFor(() => expect(logoutCalls).toBe(1));
-    expect(await screen.findByText('Login page')).toBeInTheDocument();
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/login'));
   });
 
-  // BUG: Settings implements its own logout with a client-side navigate('/login') instead of
-  // useAuthStore.logout(). The auth store keeps isAuthenticated=true and the user, and the
-  // React Query cache / sockets survive, so the "logged out" app still holds the previous
-  // user's data. It should reuse the store's logout, which does a single full reload
-  // (window.location.assign('/login'), see commit 6184ca3).
-  it.skip('BUG: signs out through the auth store (full reload to /login)', async () => {
+  it('signs out through the auth store (full reload to /login)', async () => {
     const { assign } = mockLocation();
     loginAs();
     const { user } = renderSettings();

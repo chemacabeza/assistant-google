@@ -620,7 +620,10 @@ const WhatsApp = () => {
 
 
   const visibleChats = useMemo(() => chats.filter(c => {
-    const match = (c.name || '').toLowerCase().includes(search.toLowerCase());
+    // Match what the list shows: the name, or the phone number for unnamed chats
+    const needle = search.toLowerCase();
+    const match = (c.name || '').toLowerCase().includes(needle)
+      || (c.chatId || '').split('@')[0].toLowerCase().includes(needle);
     if (filter === 'Unread')  return match && c.unreadCount > 0;
     if (filter === 'Groups')  return match && c.group;
     return match;

@@ -20,7 +20,7 @@ const Drive = () => {
   const [selectedEmail, setSelectedEmail] = useState('');
   const [folderPath, setFolderPath] = useState([{ id: 'root', name: 'My Drive' }]);
 
-  const { data: accountsData } = useQuery({
+  const { data: accountsData, isPending: accountsPending } = useQuery({
     queryKey: ['linked_accounts'],
     queryFn: async () => {
       const res = await api.get('/api/accounts');
@@ -28,11 +28,9 @@ const Drive = () => {
     }
   });
 
-  React.useEffect(() => {
-    if (accountsData?.length > 0 && !selectedEmail) {
-      setSelectedEmail(accountsData[0].email);
-    }
-  }, [accountsData, selectedEmail]);
+  // The account being browsed: the one picked in the dropdown, else the first linked account,
+  // else the signed-in user (which is what the dropdown shows when nothing is linked).
+  const ownerEmail = selectedEmail || accountsData?.[0]?.email || user?.email || '';
 
   // Reset folder path when email changes
   React.useEffect(() => {
@@ -42,9 +40,11 @@ const Drive = () => {
   const currentFolderId = folderPath[folderPath.length - 1].id;
 
   const { data: files, isLoading } = useQuery({
-    queryKey: ['drive_files', searchTerm, selectedEmail, currentFolderId],
+    queryKey: ['drive_files', searchTerm, ownerEmail, currentFolderId],
+    // Wait for the accounts so the first query already targets the right owner
+    enabled: !accountsPending && ownerEmail !== '',
     queryFn: async () => {
-      let q = `'${driveLiteral(selectedEmail)}' in owners and '${driveLiteral(currentFolderId)}' in parents and trashed=false`;
+      let q = `'${driveLiteral(ownerEmail)}' in owners and '${driveLiteral(currentFolderId)}' in parents and trashed=false`;
       if (searchTerm) {
          q = `name contains '${driveLiteral(searchTerm)}' and ${q}`;
       }
@@ -202,7 +202,7 @@ const Drive = () => {
             </label>
             <select 
               className="bg-[#131314] border border-[#747775] rounded-lg px-3 py-1.5 text-sm text-[#e3e3e3] outline-none cursor-pointer hover:bg-[#303134] transition-colors w-[300px]"
-              value={selectedEmail}
+              value={ownerEmail}
               onChange={e => setSelectedEmail(e.target.value)}
             >
               {accountsData?.length > 0 ? (
@@ -259,7 +259,7 @@ const Drive = () => {
 
           {/* Table Body */}
           <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {isLoading ? (
+            {(isLoading || accountsPending) ? (
                <div className="flex justify-center p-12">
                  <div className="animate-spin w-8 h-8 border-4 border-[#c2e7ff] border-t-transparent rounded-full"></div>
                </div>

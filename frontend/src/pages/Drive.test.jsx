@@ -118,10 +118,7 @@ describe('Drive page', () => {
     await waitFor(() => expect(queries.at(-1).q).toContain("name contains 'O\\'Brien'"));
   });
 
-  // BUG: with no linked accounts the dropdown shows the logged-in user's email, but
-  // selectedEmail stays '' so the query is "'' in owners ..." and nothing is ever listed.
-  // (The query also fires once with '' before the accounts load.)
-  it.skip("BUG: falls back to the logged-in user's email when there are no linked accounts", async () => {
+  it("falls back to the logged-in user's email when there are no linked accounts", async () => {
     server.use(http.get('/api/accounts', () => HttpResponse.json([])));
     const queries = mockDrive({ root: rootFiles });
     renderDrive();

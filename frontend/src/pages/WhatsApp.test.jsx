@@ -284,9 +284,7 @@ describe('WhatsApp page', () => {
     expect(screen.getByText('Dashboard page')).toBeInTheDocument();
   });
 
-  // BUG: the search only looks at chat.name, but unnamed chats are displayed by their phone
-  // number (chatId prefix). Typing the number you can see in the list hides that chat.
-  it.skip('BUG: finds unnamed chats by the phone number shown in the list', async () => {
+  it('finds unnamed chats by the phone number shown in the list', async () => {
     const unnamed = { chatId: '34600000000@s.whatsapp.net', name: null, unreadCount: 0, lastMessage: 'yo' };
     const { user } = await renderConnected({ chatList: [...chats, unnamed] });
     expect(screen.getByText('34600000000')).toBeInTheDocument();

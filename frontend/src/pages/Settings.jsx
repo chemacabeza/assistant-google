@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Settings as SettingsIcon,
   User,
@@ -18,9 +17,10 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { api } from '../api/axios';
+import { useAuthStore } from '../store/useAuthStore';
 
 const Settings = () => {
-  const navigate = useNavigate();
+  const logout = useAuthStore((state) => state.logout);
   const [profile, setProfile] = useState(null);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -54,16 +54,11 @@ const Settings = () => {
     }
   };
 
+  // The store's logout ends the server session and does a full reload to /login, which also
+  // drops the query cache, sockets and the previous user's state.
   const handleLogout = async () => {
     setLoggingOut(true);
-    try {
-      await api.post('/api/auth/logout');
-      navigate('/login');
-    } catch (e) {
-      // console.error('Logout failed:', e);
-      // Even if the call fails, redirect to login
-      navigate('/login');
-    }
+    await logout();
   };
 
   const getActionIcon = (actionType) => {
