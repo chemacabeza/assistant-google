@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LayoutDashboard, Mail, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import { api } from '../api/axios';
+import { decodeHtmlEntities } from '../utils/html';
 
 const Dashboard = () => {
   const [emails, setEmails] = useState([]);
@@ -8,50 +9,50 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        
-        // 1. Fetch Calendar Events
-        const eventsRes = await api.get('/api/calendar/events?maxResults=3');
-        if (eventsRes.data && eventsRes.data.items) {
-          setEvents(eventsRes.data.items);
-        }
-
-        // 2. Fetch Recent Emails (Map through IDs for details)
-        const msgRes = await api.get('/api/gmail/messages?maxResults=3');
-        if (msgRes.data && msgRes.data.messages) {
-          const emailPromises = msgRes.data.messages.map(async (msgStub) => {
-            try {
-              const detailRes = await api.get(`/api/gmail/messages/${msgStub.id}`);
-              const d = detailRes.data;
-              const headers = d.payload?.headers || [];
-              let subject = '(No Subject)';
-              let from = 'Unknown Sender';
-              
-              headers.forEach(h => {
-                if (h.name.toLowerCase() === 'subject') subject = h.value;
-                if (h.name.toLowerCase() === 'from') {
-                  // Clean up standard email format "Name <email@dest.com>"
-                  from = h.value.split('<')[0].trim();
-                }
-              });
-              
-              return { id: d.id, subject, from, snippet: d.snippet };
-            } catch (e) {
-              return null;
-            }
-          });
-          
-          let fullEmails = await Promise.all(emailPromises);
-          // Filter out failed stubs
-          setEmails(fullEmails.filter(e => e !== null));
-        }
-      } catch (err) {
-        // console.error("Failed to load dashboard sync:", err);
-      } finally {
-        setLoading(false);
+    // Calendar and Gmail load independently, so an outage of one never hides the other.
+    const loadEvents = async () => {
+      const eventsRes = await api.get('/api/calendar/events?maxResults=3');
+      if (eventsRes.data && eventsRes.data.items) {
+        setEvents(eventsRes.data.items);
       }
+    };
+
+    const loadEmails = async () => {
+      // Fetch recent message IDs, then the details of each one
+      const msgRes = await api.get('/api/gmail/messages?maxResults=3');
+      if (msgRes.data && msgRes.data.messages) {
+        const emailPromises = msgRes.data.messages.map(async (msgStub) => {
+          try {
+            const detailRes = await api.get(`/api/gmail/messages/${msgStub.id}`);
+            const d = detailRes.data;
+            const headers = d.payload?.headers || [];
+            let subject = '(No Subject)';
+            let from = 'Unknown Sender';
+
+            headers.forEach(h => {
+              if (h.name.toLowerCase() === 'subject') subject = h.value;
+              if (h.name.toLowerCase() === 'from') {
+                // Clean up standard email format "Name <email@dest.com>"
+                from = h.value.split('<')[0].trim();
+              }
+            });
+
+            return { id: d.id, subject, from, snippet: decodeHtmlEntities(d.snippet) };
+          } catch {
+            return null;
+          }
+        });
+
+        const fullEmails = await Promise.all(emailPromises);
+        // Filter out failed stubs
+        setEmails(fullEmails.filter(e => e !== null));
+      }
+    };
+
+    const fetchDashboardData = async () => {
+      setLoading(true);
+      await Promise.allSettled([loadEvents(), loadEmails()]);
+      setLoading(false);
     };
 
     fetchDashboardData();

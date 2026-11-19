@@ -115,6 +115,26 @@ describe('Templates (Scheduled Emails) page', () => {
     });
   });
 
+  it('without linked accounts the template is sent from the signed-in address', async () => {
+    server.use(http.get('/api/accounts', () => HttpResponse.json([])));
+    const state = mockTemplates();
+    const { user } = renderWithProviders(<Templates />);
+    await screen.findByText('No templates yet');
+    await user.click(screen.getByRole('button', { name: /new template/i }));
+    const f = getForm();
+    expect(f.from).toHaveValue('owner@example.com');
+
+    await user.type(f.title, 'Solo');
+    await user.type(f.target, 'x@example.com');
+    await user.type(f.date, '2099-01-01');
+    await user.type(f.time, '10:00');
+    await user.type(f.body, 'body');
+    await user.click(screen.getByRole('button', { name: /save template/i }));
+
+    await waitFor(() => expect(state.created).toHaveLength(1));
+    expect(state.created[0].fromEmail).toBe('owner@example.com');
+  });
+
   it('suggests contacts while typing the recipient', async () => {
     mockTemplates([], { contacts: [{ name: 'Grace Hopper', email: 'grace@navy.mil' }, { name: 'Alan', email: 'alan@x.org' }] });
     const { user } = renderWithProviders(<Templates />);
@@ -187,11 +207,7 @@ describe('Templates (Scheduled Emails) page', () => {
     expect(state.updated).toEqual([]);
   });
 
-  // BUG: openModal() assigns fromEmail/sendDate/sendTime directly onto the template object
-  // that lives in the React Query cache. Just opening "Edit" on a template without a sender
-  // and closing the modal (without saving) makes the card show a "From:" line that was never
-  // persisted. openModal should copy the object before modifying it.
-  it.skip('BUG: opening and closing the editor does not change the cached template', async () => {
+  it('opening and closing the editor does not change the cached template', async () => {
     mockTemplates([{ ...pending, fromEmail: null }]);
     const { user } = renderWithProviders(<Templates />);
     await user.click(await screen.findByRole('button', { name: 'Edit' }));

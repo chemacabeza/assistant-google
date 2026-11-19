@@ -182,10 +182,7 @@ describe('Calendar page', () => {
     expect(tab.location.href).toBe('');
   });
 
-  // BUG: the "Send invite to" prompt is pre-filled with a hard-coded third-party personal
-  // address. Pressing Enter sends the event to a stranger. Same class of
-  // problem as commit 080b9c8 (seeded personal addresses). The default should be empty.
-  it.skip('BUG: does not pre-fill the invite prompt with a hard-coded personal address', async () => {
+  it('does not pre-fill the invite prompt with a hard-coded personal address', async () => {
     const prompt = vi.spyOn(window, 'prompt').mockReturnValue(null);
     mockCalendar([standup]);
     const { user } = renderWithProviders(<Calendar />);

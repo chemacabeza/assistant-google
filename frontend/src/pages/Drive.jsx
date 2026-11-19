@@ -10,6 +10,10 @@ import { api } from '../api/axios';
 import { useAuthStore } from '../store/useAuthStore';
 import { Link } from 'react-router-dom';
 
+
+/** Escapes a value for a single-quoted string in a Drive API query (backslash and quote). */
+const driveLiteral = (value) => String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
 const Drive = () => {
   const { user } = useAuthStore();
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,9 +44,9 @@ const Drive = () => {
   const { data: files, isLoading } = useQuery({
     queryKey: ['drive_files', searchTerm, selectedEmail, currentFolderId],
     queryFn: async () => {
-      let q = `'${selectedEmail}' in owners and '${currentFolderId}' in parents and trashed=false`;
+      let q = `'${driveLiteral(selectedEmail)}' in owners and '${driveLiteral(currentFolderId)}' in parents and trashed=false`;
       if (searchTerm) {
-         q = `name contains '${searchTerm}' and ${q}`;
+         q = `name contains '${driveLiteral(searchTerm)}' and ${q}`;
       }
       // Fetch up to 50 items for a good representation
       const res = await api.get('/api/drive/files', { params: { q, maxResults: 50 } });

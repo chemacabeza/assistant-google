@@ -95,10 +95,7 @@ describe('Dashboard page', () => {
     expect(screen.getByText('No recent emails found.')).toBeInTheDocument();
   });
 
-  // BUG: both widgets are loaded inside one try block, calendar first. If the Calendar API
-  // fails (e.g. scope not granted) the Gmail request is never made and the email widget
-  // wrongly says "No recent emails found." even though Gmail works.
-  it.skip('BUG: still loads emails when the calendar request fails', async () => {
+  it('still loads emails when the calendar request fails', async () => {
     mockDashboardApi({
       calendarStatus: 500,
       messages: [{ id: 'm1' }],
@@ -106,5 +103,15 @@ describe('Dashboard page', () => {
     });
     renderWithProviders(<Dashboard />);
     expect(await screen.findByText('Still here')).toBeInTheDocument();
+  });
+
+  it('decodes HTML entities in mail snippets and never renders them as markup', async () => {
+    mockDashboardApi({
+      messages: [{ id: 'm1' }],
+      details: { m1: gmailDetail('m1', 'Entities', 'A <a@x>', 'don&#39;t &amp; &lt;b&gt;bold&lt;/b&gt;') },
+    });
+    const { container } = renderWithProviders(<Dashboard />);
+    expect(await screen.findByText("don't & <b>bold</b>")).toBeInTheDocument();
+    expect(container.querySelector('b')).toBeNull();
   });
 });

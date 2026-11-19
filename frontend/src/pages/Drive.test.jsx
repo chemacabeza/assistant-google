@@ -110,9 +110,7 @@ describe('Drive page', () => {
     expect(screen.getByText('Dashboard page')).toBeInTheDocument();
   });
 
-  // BUG: the search term is interpolated into the Drive query without escaping, so a name
-  // containing a quote (e.g. "O'Brien") produces an invalid q and the Drive API returns 400.
-  it.skip("BUG: escapes quotes in the search term", async () => {
+  it("escapes quotes in the search term", async () => {
     const queries = mockDrive({ root: rootFiles });
     const { user } = renderDrive();
     await screen.findByText('report.pdf');

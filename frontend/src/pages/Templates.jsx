@@ -59,9 +59,12 @@ const Templates = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['templates'] })
   });
 
-  const openModal = (temp = { id: null, title: '', content: '', category: 'General', targetEmail: '', fromEmail: '', sendDate: '', sendTime: '' }) => {
-    if (!temp.fromEmail && accountsData?.length > 0) {
-        temp.fromEmail = accountsData[0].email;
+  const openModal = (template = { id: null, title: '', content: '', category: 'General', targetEmail: '', fromEmail: '', sendDate: '', sendTime: '' }) => {
+    // Work on a copy: the template object lives in the React Query cache.
+    const temp = { ...template };
+    if (!temp.fromEmail) {
+        // Same address the "From" select shows: first linked account, else the signed-in user.
+        temp.fromEmail = accountsData?.[0]?.email || user?.email || '';
     }
     if (temp.sendAt) {
         temp.sendDate = temp.sendAt.split('T')[0];

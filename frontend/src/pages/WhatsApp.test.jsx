@@ -198,6 +198,8 @@ describe('WhatsApp page', () => {
     fire('connect');
 
     expect(await screen.findByRole('img', { name: 'WhatsApp QR' })).toHaveAttribute('src', 'blob:qr-image');
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(createObjectURL.mock.calls[0][0]).toBeInstanceOf(Blob); // the image, not the axios response
     expect(screen.getByRole('heading', { name: 'Link a device to use WhatsApp' })).toBeInTheDocument();
     expect(screen.getByText(/To use WhatsApp on your computer/)).toBeInTheDocument();
   });

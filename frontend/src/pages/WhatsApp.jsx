@@ -467,7 +467,10 @@ const WhatsApp = () => {
           } else if (hasQr) {
             setBridgeStatus('qr');
             api.get('/api/whatsapp/bridge/qr', { responseType: 'blob' })
-               .then(qr => setQrDataUrl(URL.createObjectURL(qr)))
+               .then(res => {
+                 // 204 (no QR yet) has no image; only a real PNG becomes the QR.
+                 if (res.status === 200 && res.data?.size) setQrDataUrl(URL.createObjectURL(res.data));
+               })
                .catch(() => {});
           } else if (authenticated) {
             setBridgeStatus('loading');

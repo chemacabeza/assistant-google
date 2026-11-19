@@ -92,7 +92,7 @@ const Calendar = () => {
                 <div className="flex flex-col md:flex-row gap-2 self-start md:self-center">
                   <button 
                     onClick={() => {
-                        const targetEmail = window.prompt("Send calendar invite to:", "jleehille@gmail.com");
+                        const targetEmail = window.prompt("Send calendar invite to:", "");
                         if (!targetEmail) return;
 
                         const formatToUTC = (dateStr) => {
