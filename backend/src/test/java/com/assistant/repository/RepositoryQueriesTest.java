@@ -16,7 +16,6 @@ import com.assistant.whatsapp.WhatsAppChatRepository;
 import com.assistant.whatsapp.WhatsAppMessage;
 import com.assistant.whatsapp.WhatsAppMessageRepository;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -303,10 +302,6 @@ class RepositoryQueriesTest {
         }
 
         @Test
-        @Disabled("BUG: WhatsAppMessage.timestamp is annotated @CreationTimestamp, so Hibernate overwrites the "
-                + "timestamp the bridge sends (history sync, offline messages) with the insert time. Messages are "
-                + "then ordered by when they were synced, not when they were sent. Drop @CreationTimestamp (or only "
-                + "default it when null, e.g. in @PrePersist).")
         @DisplayName("The original message timestamp from the bridge is persisted")
         void bridgeTimestampIsKept() {
             LocalDateTime sentAt = LocalDateTime.of(2025, 12, 24, 18, 30);

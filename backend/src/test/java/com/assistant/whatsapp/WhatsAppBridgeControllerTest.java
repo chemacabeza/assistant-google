@@ -45,6 +45,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("WhatsAppBridgeController - bridge ingest, proxies and chat API")
 class WhatsAppBridgeControllerTest extends WebMvcSecurityTest {
 
+    @Test
+    @DisplayName("Bridge timestamps are converted to server time; offset-less values are kept, junk is ignored")
+    void toServerTime() {
+        assertThat(WhatsAppBridgeController.toServerTime("2026-05-01T08:00:00Z")).isEqualTo(serverTime("2026-05-01T08:00:00Z"));
+        assertThat(WhatsAppBridgeController.toServerTime("2026-05-01T08:00:00.123")).isEqualTo(LocalDateTime.of(2026, 5, 1, 8, 0));
+        assertThat(WhatsAppBridgeController.toServerTime("yesterday")).isNull();
+        assertThat(WhatsAppBridgeController.toServerTime(" ")).isNull();
+        assertThat(WhatsAppBridgeController.toServerTime(null)).isNull();
+    }
+
+    /** The bridge's UTC instant as server-local wall time, which is how timestamps are stored. */
+    private static LocalDateTime serverTime(String iso) {
+        return java.time.OffsetDateTime.parse(iso).atZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDateTime();
+    }
+
+
     @TestConfiguration
     static class BridgeHttp {
         @Bean
@@ -178,7 +194,7 @@ class WhatsAppBridgeControllerTest extends WebMvcSecurityTest {
             assertThat(chat.getAvatarUrl()).isEqualTo("https://a/1.png");
             assertThat(chat.getLastMessage()).isEqualTo("See you");
             assertThat(chat.getUnreadCount()).isEqualTo(3);
-            assertThat(chat.getLastMessageTimestamp()).isEqualTo(LocalDateTime.of(2026, 5, 1, 10, 15, 30));
+            assertThat(chat.getLastMessageTimestamp()).isEqualTo(serverTime("2026-05-01T10:15:30+02:00"));
             assertThat(chat.getUpdatedAt()).isNotNull();
         }
 
@@ -239,13 +255,13 @@ class WhatsAppBridgeControllerTest extends WebMvcSecurityTest {
             assertThat(msg.getValue().getMediaBase64()).isEqualTo("QUJD");
             assertThat(msg.getValue().getMediaMimetype()).isEqualTo("image/jpeg");
             assertThat(msg.getValue().getRepliedToContent()).isEqualTo("earlier");
-            assertThat(msg.getValue().getTimestamp()).isEqualTo(LocalDateTime.of(2026, 5, 1, 8, 0));
+            assertThat(msg.getValue().getTimestamp()).isEqualTo(serverTime("2026-05-01T08:00:00Z"));
 
             assertThat(chat.getName()).isEqualTo("Ana");
             assertThat(chat.getLastMessage()).isEqualTo("📎 image");
             assertThat(chat.getLastMediaType()).isEqualTo("IMAGE");
             assertThat(chat.getLastMessageDirection()).isEqualTo("INCOMING");
-            assertThat(chat.getLastMessageTimestamp()).isEqualTo(LocalDateTime.of(2026, 5, 1, 8, 0));
+            assertThat(chat.getLastMessageTimestamp()).isEqualTo(serverTime("2026-05-01T08:00:00Z"));
             verify(chatRepository).save(chat);
         }
 
@@ -334,7 +350,7 @@ class WhatsAppBridgeControllerTest extends WebMvcSecurityTest {
 
             assertThat(chat.getLastMessage()).isEqualTo("ok");
             assertThat(chat.getLastMediaType()).isNull();
-            assertThat(chat.getLastMessageTimestamp()).isEqualTo(LocalDateTime.of(2026, 5, 2, 9, 30));
+            assertThat(chat.getLastMessageTimestamp()).isEqualTo(serverTime("2026-05-02T09:30:00.000Z"));
             assertThat(chat.getLastMessageDirection()).isEqualTo("OUTGOING");
             assertThat(chat.getName()).isEqualTo("Pablo");
             verify(chatRepository).save(chat);

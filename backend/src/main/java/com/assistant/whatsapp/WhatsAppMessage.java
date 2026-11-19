@@ -2,7 +2,6 @@ package com.assistant.whatsapp;
 
 import com.assistant.auth.User;
 import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -36,9 +35,15 @@ public class WhatsAppMessage {
 
     private String chatId; // Conversation ID from whatsapp-bridge
 
-    @CreationTimestamp
+    // When the message was sent. The bridge supplies it (history sync, offline messages);
+    // only a message without one falls back to the insert time.
     @Column(updatable = false)
     private LocalDateTime timestamp;
+
+    @PrePersist
+    void defaultTimestamp() {
+        if (timestamp == null) timestamp = LocalDateTime.now();
+    }
 
     @Column(columnDefinition = "TEXT")
     private String repliedToContent;

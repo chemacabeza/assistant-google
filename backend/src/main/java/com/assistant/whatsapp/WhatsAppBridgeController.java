@@ -100,6 +100,24 @@ public class WhatsAppBridgeController {
             && java.util.Arrays.equals(bytes, 0, PNG_SIGNATURE.length, PNG_SIGNATURE, 0, PNG_SIGNATURE.length);
     }
 
+    /**
+     * The bridge sends ISO-8601 instants (UTC, "...Z"). Times are stored as server-local wall
+     * time, like LocalDateTime.now() for live messages, so convert instead of dropping the
+     * offset. A value without an offset is taken as already local; unparseable values give null.
+     */
+    static LocalDateTime toServerTime(String iso) {
+        if (iso == null || iso.isBlank()) return null;
+        try {
+            return OffsetDateTime.parse(iso).atZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDateTime();
+        } catch (java.time.format.DateTimeParseException e) {
+            try {
+                return LocalDateTime.parse(iso.length() > 19 ? iso.substring(0, 19) : iso);
+            } catch (java.time.format.DateTimeParseException ignored) {
+                return null;
+            }
+        }
+    }
+
     // ─── Bridge Ingest: Chat Sync ─────────────────────────────────────────────
 
     @PostMapping("/bridge/chat")
@@ -118,11 +136,8 @@ public class WhatsAppBridgeController {
 
         String tsStr = (String) payload.get("lastMessageTimestamp");
         if (tsStr != null) {
-            try {
-                chat.setLastMessageTimestamp(OffsetDateTime.parse(tsStr).toLocalDateTime());
-            } catch (Exception e) {
-                chat.setLastMessageTimestamp(LocalDateTime.now());
-            }
+            LocalDateTime ts = toServerTime(tsStr);
+            chat.setLastMessageTimestamp(ts != null ? ts : LocalDateTime.now());
         }
 
         chatRepository.save(chat);
@@ -164,12 +179,8 @@ public class WhatsAppBridgeController {
         }
 
         // Timestamp
-        LocalDateTime timestamp = LocalDateTime.now();
-        String tsStr = (String) payload.get("timestamp");
-        if (tsStr != null) {
-            try { timestamp = OffsetDateTime.parse(tsStr).toLocalDateTime(); }
-            catch (Exception ignored) {}
-        }
+        LocalDateTime timestamp = toServerTime((String) payload.get("timestamp"));
+        if (timestamp == null) timestamp = LocalDateTime.now();
 
         WhatsAppMessage msg = new WhatsAppMessage(
             chatId, messageWaId, senderId, senderName,
@@ -237,11 +248,8 @@ public class WhatsAppBridgeController {
         chatRepository.findByChatId(chatId).ifPresentOrElse(chat -> {
             if (lastMsg != null) chat.setLastMessage(lastMsg);
             chat.setLastMediaType(mediaType); // null clears it for text-only msgs
-            if (tsStr != null) {
-                try {
-                    chat.setLastMessageTimestamp(LocalDateTime.parse(tsStr.substring(0, 19)));
-                } catch (Exception ignored) {}
-            }
+            LocalDateTime previewTs = toServerTime(tsStr);
+            if (previewTs != null) chat.setLastMessageTimestamp(previewTs);
             if (direction != null) chat.setLastMessageDirection(direction);
             
             // Resolve name from pushName if currently a phone number
@@ -260,11 +268,8 @@ public class WhatsAppBridgeController {
             chat.setName(pushName != null ? pushName : chatId.split("@")[0]);
             chat.setLastMessage(lastMsg);
             chat.setLastMediaType(mediaType);
-            if (tsStr != null) {
-                try {
-                    chat.setLastMessageTimestamp(LocalDateTime.parse(tsStr.substring(0, 19)));
-                } catch (Exception ignored) {}
-            }
+            LocalDateTime previewTs = toServerTime(tsStr);
+            if (previewTs != null) chat.setLastMessageTimestamp(previewTs);
             chat.setLastMessageDirection(direction);
             chat.setUpdatedAt(LocalDateTime.now());
             chatRepository.save(chat);
