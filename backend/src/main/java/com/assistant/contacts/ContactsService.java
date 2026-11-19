@@ -23,11 +23,9 @@ public class ContactsService {
     public List<ContactDto> searchPeople(String query) {
         try {
             Map searchResponse = webClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("https://people.googleapis.com/v1/people:searchContacts")
-                            .queryParam("query", query)
-                            .queryParam("readMask", "names,emailAddresses")
-                            .build())
+                    // URI template variables are fully encoded, so any query text is safe
+                    .uri("https://people.googleapis.com/v1/people:searchContacts?query={query}&readMask={readMask}",
+                            query, "names,emailAddresses")
                     .retrieve()
                     .bodyToMono(Map.class)
                     .block();

@@ -4,7 +4,6 @@ import com.assistant.contacts.ContactsService.ContactDto;
 import com.assistant.testsupport.StubExchangeFunction;
 import com.assistant.testsupport.StubExchangeFunction.RecordedRequest;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -30,10 +29,6 @@ class ContactsServiceTest {
     // ── searchPeople ───────────────────────────────────────────────────────
 
     @Test
-    @Disabled("BUG: searchPeople passes the absolute URL to UriBuilder.path(), producing "
-            + "'https:/people.googleapis.com/v1/people:searchContacts?...' (no host). With the real Netty "
-            + "connector the request fails, the exception is swallowed and every contact search returns []. "
-            + "Use .uri(\"https://people.googleapis.com/v1/people:searchContacts?query={q}&readMask=...\", query).")
     @DisplayName("searchPeople calls searchContacts on people.googleapis.com with the query and readMask")
     void searchPeopleBuildsRequest() {
         http.enqueueJson("{\"results\":[]}");

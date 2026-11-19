@@ -3,7 +3,6 @@ package com.assistant.gmail;
 import com.assistant.testsupport.StubExchangeFunction;
 import com.assistant.testsupport.StubExchangeFunction.RecordedRequest;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -58,8 +57,6 @@ class GmailServiceTest {
     }
 
     @Test
-    @Disabled("BUG: GmailService concatenates the search query into the URL without encoding it, so '&' splits "
-            + "it into a second parameter (and '#' or '{' break the URL entirely). Use UriBuilder.queryParam instead.")
     @DisplayName("listMessages keeps a query containing '&' intact")
     void listMessagesQueryWithAmpersandIsNotSplit() {
         http.enqueueJson("{}");
@@ -67,6 +64,12 @@ class GmailServiceTest {
         gmailService.listMessages("subject:Q&A", 5);
 
         assertThat(http.lastRequest().queryParam("q")).isEqualTo("subject:Q&A");
+        assertThat(http.lastRequest().queryParam("maxResults")).isEqualTo("5");
+        assertThat(http.lastRequest().queryParamCount()).isEqualTo(2);
+
+        http.enqueueJson("{}");
+        gmailService.listMessages("subject:#1 {draft} a+b", 3);
+        assertThat(http.lastRequest().queryParam("q")).isEqualTo("subject:#1 {draft} a+b");
     }
 
     @Test

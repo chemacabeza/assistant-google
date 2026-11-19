@@ -16,13 +16,12 @@ public class GmailService {
      * Lists recent messages
      */
     public Object listMessages(String query, int maxResults) {
-        String finalUrl = GMAIL_BASE_URL + "/messages?maxResults=" + maxResults;
-        if (query != null && !query.isEmpty()) {
-            finalUrl += "&q=" + query;
-        }
+        // URI template variables are fully encoded, so '&', '#' or '{' in a search stay part of q
+        WebClient.RequestHeadersSpec<?> request = (query != null && !query.isEmpty())
+                ? webClient.get().uri(GMAIL_BASE_URL + "/messages?maxResults={max}&q={q}", maxResults, query)
+                : webClient.get().uri(GMAIL_BASE_URL + "/messages?maxResults={max}", maxResults);
 
-        return webClient.get()
-                .uri(finalUrl)
+        return request
                 .retrieve()
                 .bodyToMono(Object.class)
                 .block();
