@@ -18,6 +18,7 @@ module.exports = {
     second: { email: 'second@example.com', name: 'Second User' },
   },
   WEBHOOK_VERIFY_TOKEN: process.env.E2E_WEBHOOK_VERIFY_TOKEN || 'chema_assistant_2026',
+  WEBHOOK_APP_SECRET: process.env.E2E_WEBHOOK_APP_SECRET || 'e2e-app-secret',
   DB_CONTAINER: process.env.E2E_DB_CONTAINER || 'assistant-e2e-postgres',
   DB_USER: process.env.POSTGRES_USER || 'assistant_user',
   DB_NAME: process.env.POSTGRES_DB || 'assistant_db',

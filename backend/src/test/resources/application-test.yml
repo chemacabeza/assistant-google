@@ -33,5 +33,6 @@ OPENAI_API_KEY: ""
 VITE_GOOGLE_MAPS_API_KEY: ""
 TELEGRAM_BOT_TOKEN: ""
 WHATSAPP_VERIFY_TOKEN: test-verify-token
+WHATSAPP_APP_SECRET: test-app-secret
 # Nothing listens on the discard port, so bridge calls fail fast instead of reaching a real bridge.
 BRIDGE_URL: http://127.0.0.1:9

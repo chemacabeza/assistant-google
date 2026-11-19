@@ -1,8 +1,23 @@
 const { test, expect } = require('@playwright/test');
-const { WEBHOOK_VERIFY_TOKEN } = require('../../helpers/env');
+const crypto = require('node:crypto');
+const { WEBHOOK_VERIFY_TOKEN, WEBHOOK_APP_SECRET } = require('../../helpers/env');
 const { rows, lit, psql, runId } = require('../../helpers/db');
 
 const WEBHOOK = '/api/whatsapp/webhook';
+
+/** Meta signs the raw body: X-Hub-Signature-256 = sha256=HMAC-SHA256(app secret, body). */
+const signature = (body, secret = WEBHOOK_APP_SECRET) =>
+  `sha256=${crypto.createHmac('sha256', secret).update(body).digest('hex')}`;
+
+/** POSTs a delivery the way Meta does: JSON body plus its signature. */
+function deliver(request, payload, sign = signature) {
+  const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  return request.post(WEBHOOK, {
+    headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': sign(body) },
+    // A Buffer is sent byte for byte; a non-JSON string would be JSON-encoded by Playwright first.
+    data: Buffer.from(body),
+  });
+}
 
 function metaPayload({ from, id, text, profileName }) {
   return {
@@ -62,9 +77,7 @@ test.describe('backend: WhatsApp webhook (Meta Cloud API) + database', () => {
     senders.push(from);
     const sid = `wamid.${run}.1`;
 
-    const res = await request.post(WEBHOOK, {
-      data: metaPayload({ from, id: sid, text: 'Hallo from e2e', profileName: 'E2E Tester' }),
-    });
+    const res = await deliver(request, metaPayload({ from, id: sid, text: 'Hallo from e2e', profileName: 'E2E Tester' }));
     expect(res.status()).toBe(200);
 
     const stored = rows(`select sender_id, sender_name, content, direction, message_sid
@@ -79,7 +92,7 @@ test.describe('backend: WhatsApp webhook (Meta Cloud API) + database', () => {
     senders.push(from);
     const sid = `wamid.${run}.2`;
 
-    await request.post(WEBHOOK, { data: metaPayload({ from, id: sid, text: 'no profile' }) });
+    await deliver(request, metaPayload({ from, id: sid, text: 'no profile' }));
 
     const [stored] = rows(`select sender_name from whatsapp_messages where message_sid = ${lit(sid)}`);
     expect(stored.sender_name).toBe(from);
@@ -93,19 +106,28 @@ test.describe('backend: WhatsApp webhook (Meta Cloud API) + database', () => {
     delete payload.entry[0].changes[0].value.messages[0].text;
     payload.entry[0].changes[0].value.messages[0].type = 'image';
 
-    const res = await request.post(WEBHOOK, { data: payload });
+    const res = await deliver(request, payload);
     expect(res.status()).toBe(200);
     expect(rows(`select 1 as n from whatsapp_messages where message_sid = ${lit(sid)}`)).toHaveLength(0);
   });
 
   test('malformed payloads are acknowledged without crashing the service', async ({ request }) => {
-    const res = await request.post(WEBHOOK, {
-      headers: { 'Content-Type': 'application/json' },
-      data: '{ this is not json',
-    });
+    const res = await deliver(request, '{ this is not json');
     expect(res.status()).toBe(200);
 
     const health = await request.get('/api/auth/profile');
     expect(health.status()).toBe(401); // still serving requests
+  });
+
+  test('unsigned or wrongly signed deliveries are refused and nothing is stored', async ({ request }) => {
+    const from = `49173${run}`;
+    senders.push(from);
+    const sid = `wamid.${run}.forged`;
+    const payload = metaPayload({ from, id: sid, text: 'forged', profileName: 'Mallory' });
+
+    expect((await request.post(WEBHOOK, { data: payload })).status()).toBe(403);
+    expect((await deliver(request, payload, (body) => signature(body, 'not-the-app-secret'))).status()).toBe(403);
+    expect((await deliver(request, payload, () => signature('{}'))).status()).toBe(403); // body was tampered with
+    expect(rows(`select 1 as n from whatsapp_messages where message_sid = ${lit(sid)}`)).toHaveLength(0);
   });
 });

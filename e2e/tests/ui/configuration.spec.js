@@ -56,6 +56,7 @@ test.describe('ui: configuration', () => {
       WHATSAPP_ACCESS_TOKEN: '',
       WHATSAPP_PHONE_NUMBER_ID: '',
       WHATSAPP_VERIFY_TOKEN: DATA.CONFIG_ENV.WHATSAPP_VERIFY_TOKEN,
+      WHATSAPP_APP_SECRET: '',
     });
     await expect(page.getByText('Configuration saved. Restart containers to apply changes.')).toBeVisible();
     await expect(save(page)).toHaveText(/Saved/);

@@ -46,7 +46,7 @@ public class ConfigController {
             "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
             "OPENAI_API_KEY", "VITE_GOOGLE_MAPS_API_KEY",
             "WHATSAPP_PHONE_NUMBER", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID",
-            "WHATSAPP_VERIFY_TOKEN"
+            "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_APP_SECRET"
         );
 
         try {
@@ -85,7 +85,7 @@ public class ConfigController {
             "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
             "OPENAI_API_KEY", "VITE_GOOGLE_MAPS_API_KEY",
             "WHATSAPP_PHONE_NUMBER", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID",
-            "WHATSAPP_VERIFY_TOKEN"
+            "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_APP_SECRET"
         );
 
         // One line per variable: a line break in a value would smuggle extra (non-configurable)

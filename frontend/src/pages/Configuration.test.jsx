@@ -81,6 +81,7 @@ describe('Configuration page', () => {
       WHATSAPP_ACCESS_TOKEN: '',
       WHATSAPP_PHONE_NUMBER_ID: '',
       WHATSAPP_VERIFY_TOKEN: '',
+      WHATSAPP_APP_SECRET: '',
     }]);
     expect(JSON.parse(localStorage.getItem('assistant_ui_config'))).toEqual({ appName: 'Jarvis', emailInvitees: true });
   });
@@ -112,16 +113,19 @@ describe('Configuration page', () => {
     expect(gmail).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
-  // BUG: if GET /api/config/env fails the page silently renders empty fields, and "Save"
-  // then POSTs every key as "" — the backend (ConfigController.saveEnv) overwrites the real
-  // values in .env, wiping all credentials. Load errors should be surfaced and saving blocked
-  // (or only changed keys sent).
-  it.skip('BUG: does not overwrite .env with empty values after a failed load', async () => {
+  it('does not overwrite .env with empty values after a failed load', async () => {
     const saved = mockConfig({ getStatus: 500 });
     const { user } = renderWithProviders(<Configuration />);
     await waitFor(() => expect(screen.queryByText('Loading configuration from .env...')).not.toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: /save configuration/i }));
     await new Promise((r) => setTimeout(r, 50));
     expect(saved).toEqual([]);
+    expect(screen.getByText(/API keys were not saved because they could not be loaded/)).toBeInTheDocument();
+  });
+
+  it('tells the user when the API keys could not be loaded', async () => {
+    mockConfig({ getStatus: 500 });
+    renderWithProviders(<Configuration />);
+    expect(await screen.findByText(/Could not load the API keys from \.env/)).toBeInTheDocument();
   });
 });

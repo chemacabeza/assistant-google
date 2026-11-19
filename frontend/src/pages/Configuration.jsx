@@ -17,6 +17,7 @@ const defaultConfig = {
     WHATSAPP_ACCESS_TOKEN: '',
     WHATSAPP_PHONE_NUMBER_ID: '',
     WHATSAPP_VERIFY_TOKEN: '',
+    WHATSAPP_APP_SECRET: '',
   },
 };
 
@@ -26,6 +27,9 @@ const Configuration = () => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [statusMsg, setStatusMsg] = useState('');
+  // When the keys could not be loaded the fields are empty placeholders, not the real values,
+  // so they must never be written back to .env.
+  const [envLoadFailed, setEnvLoadFailed] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState({});
 
   // Load config on mount: UI settings from localStorage, API keys from backend .env
@@ -55,10 +59,12 @@ const Configuration = () => {
             WHATSAPP_ACCESS_TOKEN: envKeys.WHATSAPP_ACCESS_TOKEN || '',
             WHATSAPP_PHONE_NUMBER_ID: envKeys.WHATSAPP_PHONE_NUMBER_ID || '',
             WHATSAPP_VERIFY_TOKEN: envKeys.WHATSAPP_VERIFY_TOKEN || '',
+            WHATSAPP_APP_SECRET: envKeys.WHATSAPP_APP_SECRET || '',
           },
         });
-      } catch (e) {
-        // console.error('Failed to load configuration:', e);
+      } catch {
+        setEnvLoadFailed(true);
+        setStatusMsg('Could not load the API keys from .env. Reload the page before editing them; saving keys is disabled so the current values are not overwritten.');
       } finally {
         setLoading(false);
       }
@@ -75,6 +81,11 @@ const Configuration = () => {
         appName: config.appName,
         emailInvitees: config.emailInvitees,
       }));
+
+      if (envLoadFailed) {
+        setStatusMsg('Display settings saved. API keys were not saved because they could not be loaded; reload the page and try again.');
+        return;
+      }
 
       // Save API keys to backend .env file
       const res = await api.post('/api/config/env', config.apiKeys);
@@ -163,6 +174,7 @@ const Configuration = () => {
     { key: 'WHATSAPP_ACCESS_TOKEN', label: 'WhatsApp Access Token', icon: <Key size={16} />, hint: 'Permanent token from Meta App Dashboard' },
     { key: 'WHATSAPP_PHONE_NUMBER_ID', label: 'WhatsApp Phone ID', icon: <MessageSquare size={16} />, hint: 'Unique ID for your business phone number' },
     { key: 'WHATSAPP_VERIFY_TOKEN', label: 'WhatsApp Verify Token', icon: <Shield size={16} />, hint: 'Custom string used to verify the Meta webhook callback' },
+    { key: 'WHATSAPP_APP_SECRET', label: 'WhatsApp App Secret', icon: <Key size={16} />, hint: 'Meta app secret; webhook deliveries without a valid signature are refused' },
   ];
 
   return (
@@ -363,6 +375,7 @@ const Configuration = () => {
                 <code className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-mono font-semibold">→ WHATSAPP_ACCESS_TOKEN</code>
                 <code className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-mono font-semibold">→ WHATSAPP_PHONE_NUMBER_ID</code>
                 <code className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-mono font-semibold">→ WHATSAPP_VERIFY_TOKEN</code>
+                <code className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-mono font-semibold">→ WHATSAPP_APP_SECRET</code>
               </div>
             </div>
           </a>

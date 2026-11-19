@@ -1,7 +1,6 @@
 package com.assistant.whatsapp;
 
 import com.assistant.testsupport.WebMvcSecurityTest;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -22,7 +21,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** The verify token comes from the test profile: {@code WHATSAPP_VERIFY_TOKEN=test-verify-token}. */
+/**
+ * The verify token and app secret come from the test profile:
+ * {@code WHATSAPP_VERIFY_TOKEN=test-verify-token}, {@code WHATSAPP_APP_SECRET=test-app-secret}.
+ */
 @WebMvcTest(WhatsAppWebhookController.class)
 @DisplayName("WhatsAppWebhookController - Meta Cloud API webhook")
 class WhatsAppWebhookControllerTest extends WebMvcSecurityTest {
@@ -87,7 +89,7 @@ class WhatsAppWebhookControllerTest extends WebMvcSecurityTest {
     @Test
     @DisplayName("POST stores text messages (anonymous, no CSRF) with the sender's profile name")
     void storesTextMessages() throws Exception {
-        mockMvc.perform(post("/api/whatsapp/webhook").contentType(MediaType.APPLICATION_JSON).content(TEXT_MESSAGE))
+        mockMvc.perform(signed(TEXT_MESSAGE))
                 .andExpect(status().isOk());
 
         ArgumentCaptor<WhatsAppMessage> captor = ArgumentCaptor.forClass(WhatsAppMessage.class);
@@ -108,7 +110,7 @@ class WhatsAppWebhookControllerTest extends WebMvcSecurityTest {
     @Test
     @DisplayName("POST acknowledges status-only notifications without storing anything")
     void statusNotification() throws Exception {
-        mockMvc.perform(post("/api/whatsapp/webhook").contentType(MediaType.APPLICATION_JSON).content("""
+        mockMvc.perform(signed("""
                         {"entry":[{"changes":[{"value":{"statuses":[{"id":"wamid.A","status":"read"}]}}]}]}
                         """))
                 .andExpect(status().isOk());
@@ -119,23 +121,60 @@ class WhatsAppWebhookControllerTest extends WebMvcSecurityTest {
     @Test
     @DisplayName("POST acknowledges an unparseable payload with 200 so Meta does not retry forever")
     void malformedPayload() throws Exception {
-        mockMvc.perform(post("/api/whatsapp/webhook").contentType(MediaType.APPLICATION_JSON).content("{oops"))
-                .andExpect(status().isOk());
-        mockMvc.perform(post("/api/whatsapp/webhook").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"entry\":[{\"changes\":[{\"field\":\"x\"}]}]}"))
-                .andExpect(status().isOk());
+        mockMvc.perform(signed("{oops")).andExpect(status().isOk());
+        mockMvc.perform(signed("{\"entry\":[{\"changes\":[{\"field\":\"x\"}]}]}")).andExpect(status().isOk());
 
         verify(repository, never()).save(any());
     }
 
     @Test
-    @Disabled("BUG (security): the webhook does not verify Meta's X-Hub-Signature-256 HMAC (app secret), and it "
-            + "is permitAll + CSRF-exempt, so anyone can POST forged 'incoming' WhatsApp messages into the database.")
     @DisplayName("POST without a valid X-Hub-Signature-256 is rejected")
     void unsignedPayloadRejected() throws Exception {
         mockMvc.perform(post("/api/whatsapp/webhook").contentType(MediaType.APPLICATION_JSON).content(TEXT_MESSAGE))
                 .andExpect(status().isForbidden());
+        // signed with another secret
+        mockMvc.perform(post("/api/whatsapp/webhook").contentType(MediaType.APPLICATION_JSON).content(TEXT_MESSAGE)
+                        .header("X-Hub-Signature-256", signature("wrong-secret", TEXT_MESSAGE)))
+                .andExpect(status().isForbidden());
+        // signature of a different body (tampered payload)
+        mockMvc.perform(post("/api/whatsapp/webhook").contentType(MediaType.APPLICATION_JSON).content(TEXT_MESSAGE)
+                        .header("X-Hub-Signature-256", signature(SECRET, "{}")))
+                .andExpect(status().isForbidden());
+        // not even hex
+        mockMvc.perform(post("/api/whatsapp/webhook").contentType(MediaType.APPLICATION_JSON).content(TEXT_MESSAGE)
+                        .header("X-Hub-Signature-256", "sha256=zz"))
+                .andExpect(status().isForbidden());
 
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("POST is refused when no app secret is configured, even with a signature")
+    void noSecretConfigured(@org.springframework.beans.factory.annotation.Autowired WhatsAppWebhookController controller)
+            throws Exception {
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "appSecret", "");
+        try {
+            mockMvc.perform(signed(TEXT_MESSAGE)).andExpect(status().isForbidden());
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(controller, "appSecret", SECRET);
+        }
+        verify(repository, never()).save(any());
+    }
+
+    // ── helpers ────────────────────────────────────────────────────────────
+
+    private static final String SECRET = "test-app-secret";
+
+    /** Meta's X-Hub-Signature-256 header value for {@code body}. */
+    private static String signature(String secret, String body) throws Exception {
+        javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+        mac.init(new javax.crypto.spec.SecretKeySpec(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256"));
+        return "sha256=" + java.util.HexFormat.of().formatHex(mac.doFinal(body.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
+
+    /** An anonymous POST without CSRF, signed like a genuine Meta delivery. */
+    private static org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder signed(String body) throws Exception {
+        return post("/api/whatsapp/webhook").contentType(MediaType.APPLICATION_JSON).content(body)
+                .header("X-Hub-Signature-256", signature(SECRET, body));
     }
 }
