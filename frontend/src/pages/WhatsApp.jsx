@@ -34,7 +34,8 @@ const C = {
 /* ─── Bridge Socket.io URL  ──────────────────────────────────────────────── */
 // Connect directly to the bridge for real-time events.
 // Uses the current hostname so it works both locally and over network.
-const BRIDGE_WS_URL = `http://${window.location.hostname}:3001`;
+// docker-compose publishes the bridge (port 3001 in its container) on host port 3002.
+const BRIDGE_WS_URL = `http://${window.location.hostname}:3002`;
 
 /* ─── Avatar palette ─────────────────────────────────────────────────────── */
 const AVATAR_BG = [

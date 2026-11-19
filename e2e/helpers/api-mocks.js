@@ -359,7 +359,7 @@ const test = base.extend({
 
   // Auto: every test in the project is signed in and sandboxed, even if it never touches `api`.
   api: [async ({ page, bridge, pageErrors, dialogs }, use) => {
-    // Nothing leaves the machine: Google Maps, avatars, fonts, the real bridge on :3001...
+    // Nothing leaves the machine: Google Maps, avatars, fonts, the real bridge on :3002...
     const external = [];
     await page.context().route(
       (url) => url.origin !== FRONTEND_ORIGIN,

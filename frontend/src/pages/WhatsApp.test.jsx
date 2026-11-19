@@ -93,11 +93,11 @@ beforeEach(() => {
 });
 
 describe('WhatsApp page', () => {
-  it('connects to the bridge socket on port 3001 and disconnects on unmount', () => {
+  it('connects to the bridge socket on host port 3002 and disconnects on unmount', () => {
     mockBridge();
     const { unmount } = renderWhatsApp();
     expect(sockets.io).toHaveBeenCalledWith(
-      `http://${window.location.hostname}:3001`,
+      `http://${window.location.hostname}:3002`,
       expect.objectContaining({ transports: ['websocket', 'polling'] }),
     );
     unmount();

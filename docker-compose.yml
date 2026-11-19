@@ -72,7 +72,8 @@ services:
       network: host
     container_name: assistant-whatsapp-bridge
     ports:
-      - "127.0.0.1:3001:3001"
+      # Host port 3002: the browser reaches the bridge socket here (WhatsApp.jsx).
+      - "127.0.0.1:3002:3001"
     environment:
       - BACKEND_URL=http://backend:8080
       - SESSION_DIR=/app/sessions

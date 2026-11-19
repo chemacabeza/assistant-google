@@ -138,11 +138,11 @@ Three scripts in the repository root manage the fully dockerised stack:
 | Web UI (Nginx, proxies `/api` to the backend) | `http://localhost:5173` |
 | Backend API | `http://127.0.0.1:8081` |
 | PostgreSQL | `127.0.0.1:5433` |
-| WhatsApp bridge | `http://127.0.0.1:3001` |
+| WhatsApp bridge | `http://127.0.0.1:3002` (port `3001` inside Docker) |
 
 **Option B: Backend and frontend on the host (hot reload)**
 1. Start only PostgreSQL: `docker compose up db -d` (published on port `5433`, which the default `SPRING_DATASOURCE_URL` in `.env.example` already uses).
-2. Start the backend: `cd backend && ./mvnw spring-boot:run`. It reads the repo-root `.env`. If you also want the WhatsApp bridge, start it with `docker compose up whatsapp-bridge -d` and set `BRIDGE_URL=http://localhost:3001` in `.env`.
+2. Start the backend: `cd backend && ./mvnw spring-boot:run`. It reads the repo-root `.env`. If you also want the WhatsApp bridge, start it with `docker compose up whatsapp-bridge -d` and set `BRIDGE_URL=http://localhost:3002` in `.env`.
 3. Start the frontend: `cd frontend && npm install && npm run dev`.
 4. Open `http://localhost:5173`. The Vite dev server proxies `/api`, `/oauth2` and `/login` to the backend on port 8080.
 
