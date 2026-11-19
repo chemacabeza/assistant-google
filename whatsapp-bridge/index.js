@@ -66,6 +66,16 @@ const storeFlush = setInterval(() => {
 }, 10000);
 
 /**
+ * Ends a Baileys socket without crashing the process. Closing a socket that is still connecting
+ * makes `ws` emit 'error' on the next tick, after Baileys' end() has removed its own 'error'
+ * listener; an 'error' event without a listener throws and would kill the bridge.
+ */
+function endSocketQuietly(s) {
+  try { s.end(undefined); } catch { /* already closed */ }
+  s.ws?.on?.('error', () => {});
+}
+
+/**
  * Empties SESSION_DIR without removing the directory itself. In Docker the
  * directory is a volume mount point, so rmSync() on it fails with EBUSY.
  */
@@ -632,8 +642,13 @@ app.post('/logout', async (req, res) => {
   // console.log('[Bridge] 🔴 Logout requested');
   try {
     if (sock) {
-      await sock.logout().catch(() => {});
-      sock.end();
+      const s = sock;
+      sock = null;
+      s.ev.removeAllListeners(); // no reconnect: the process restarts below
+      // Only a linked session can be logged out on WhatsApp's side; while the socket is still
+      // opening or just showing a QR, logout() fails or waits for an answer that never comes.
+      if (isConnected) await s.logout().catch(() => {});
+      endSocketQuietly(s);
     }
     if (fs.existsSync(AUTH_DIR)) {
       // console.log('[Bridge] Wiping auth_info...');
@@ -660,7 +675,7 @@ app.post('/reset', async (req, res) => {
     if (sock) {
       // console.log('[Bridge] Closing socket...');
       sock.ev.removeAllListeners();
-      try { sock.ws.close(); } catch (e) {}
+      endSocketQuietly(sock);
       sock = null;
     }
 
