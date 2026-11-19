@@ -68,16 +68,21 @@ public class WhatsAppBridgeController {
 
     // ─── Bridge Proxy: QR Image ───────────────────────────────────────────────
 
+    private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+
     @GetMapping("/bridge/qr")
     public ResponseEntity<byte[]> getBridgeQr() {
         try {
-            byte[] qrBytes = webClient.get()
+            ResponseEntity<byte[]> upstream = webClient.get()
                 .uri(bridgeUrl + "/qr")
                 .accept(MediaType.IMAGE_PNG)
                 .retrieve()
-                .bodyToMono(byte[].class)
+                .toEntity(byte[].class)
                 .block(java.time.Duration.ofSeconds(5));
-            if (qrBytes == null || qrBytes.length == 0) {
+            byte[] qrBytes = upstream == null ? null : upstream.getBody();
+            // While no QR exists yet the bridge answers 202 with a JSON message; only a real PNG
+            // is passed on as an image, anything else means "no QR right now".
+            if (upstream == null || upstream.getStatusCode().value() != 200 || !isPng(qrBytes)) {
                 return ResponseEntity.noContent().build();
             }
             return ResponseEntity.ok()
@@ -88,6 +93,11 @@ public class WhatsAppBridgeController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         }
+    }
+
+    private static boolean isPng(byte[] bytes) {
+        return bytes != null && bytes.length >= PNG_SIGNATURE.length
+            && java.util.Arrays.equals(bytes, 0, PNG_SIGNATURE.length, PNG_SIGNATURE, 0, PNG_SIGNATURE.length);
     }
 
     // ─── Bridge Ingest: Chat Sync ─────────────────────────────────────────────

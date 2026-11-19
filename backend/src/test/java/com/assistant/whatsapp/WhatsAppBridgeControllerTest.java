@@ -3,7 +3,6 @@ package com.assistant.whatsapp;
 import com.assistant.testsupport.StubExchangeFunction;
 import com.assistant.testsupport.WebMvcSecurityTest;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -135,18 +134,24 @@ class WhatsAppBridgeControllerTest extends WebMvcSecurityTest {
         }
 
         @Test
-        @Disabled("BUG (security): '/api/whatsapp/bridge/**' is permitAll and CSRF-exempt, which also covers the "
-                + "frontend-facing proxies /bridge/reset, /bridge/logout, /bridge/clear-all and /bridge/qr. Any "
-                + "anonymous caller can wipe all WhatsApp data, unlink the session or fetch the pairing QR. Only the "
-                + "ingest endpoints should be open (ideally behind a shared secret).")
         @DisplayName("Anonymous callers cannot reset/log out the bridge or fetch its pairing QR")
         void destructiveProxiesRequireAuth() throws Exception {
             bridge.otherwiseJson("{\"success\":true}");
 
-            mockMvc.perform(post("/api/whatsapp/bridge/reset")).andExpect(status().isUnauthorized());
-            mockMvc.perform(post("/api/whatsapp/bridge/logout")).andExpect(status().isUnauthorized());
+            mockMvc.perform(post("/api/whatsapp/bridge/reset").with(csrf())).andExpect(status().isUnauthorized());
+            mockMvc.perform(post("/api/whatsapp/bridge/logout").with(csrf())).andExpect(status().isUnauthorized());
             mockMvc.perform(get("/api/whatsapp/bridge/qr")).andExpect(status().isUnauthorized());
             verify(messageRepository, never()).deleteAll();
+            assertThat(bridge.requests()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Resetting or logging out the bridge requires a CSRF token even when signed in")
+        void destructiveProxiesRequireCsrf() throws Exception {
+            mockMvc.perform(post("/api/whatsapp/bridge/reset").with(user())).andExpect(status().isForbidden());
+            mockMvc.perform(post("/api/whatsapp/bridge/logout").with(user())).andExpect(status().isForbidden());
+            verify(messageRepository, never()).deleteAll();
+            assertThat(bridge.requests()).isEmpty();
         }
     }
 
@@ -428,7 +433,7 @@ class WhatsAppBridgeControllerTest extends WebMvcSecurityTest {
         @Test
         @DisplayName("GET /bridge/qr returns the PNG from the bridge")
         void qrPng() throws Exception {
-            byte[] png = {(byte) 0x89, 'P', 'N', 'G'};
+            byte[] png = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n', 0, 0, 0, 13};
             bridge.enqueue(request -> Mono.just(ClientResponse.create(HttpStatus.OK, ExchangeStrategies.withDefaults())
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.IMAGE_PNG_VALUE)
                     .body(reactor.core.publisher.Flux.just(new org.springframework.core.io.buffer.DefaultDataBufferFactory().wrap(png)))
@@ -445,6 +450,16 @@ class WhatsAppBridgeControllerTest extends WebMvcSecurityTest {
         @DisplayName("GET /bridge/qr answers 204 when there is no QR, mirrors bridge errors, and 503 when unreachable")
         void qrEdgeCases() throws Exception {
             bridge.enqueue(request -> Mono.just(StubExchangeFunction.json(HttpStatus.OK, null)));
+            mockMvc.perform(get("/api/whatsapp/bridge/qr").with(user())).andExpect(status().isNoContent());
+
+            // No QR yet: the bridge answers 202 + JSON, which must never be served as image/png
+            bridge.enqueue(HttpStatus.ACCEPTED, "{\"message\":\"QR not yet generated\"}");
+            mockMvc.perform(get("/api/whatsapp/bridge/qr").with(user()))
+                    .andExpect(status().isNoContent())
+                    .andExpect(content().bytes(new byte[0]));
+
+            // A 200 whose body is not a PNG is not passed on as an image either
+            bridge.enqueueJson("{\"qr\":\"text\"}");
             mockMvc.perform(get("/api/whatsapp/bridge/qr").with(user())).andExpect(status().isNoContent());
 
             bridge.enqueue(HttpStatus.NOT_FOUND, "{}");

@@ -37,6 +37,19 @@ public class SecurityConfig {
     private final CustomOidcUserService customOidcUserService;
     private final CustomOAuth2AuthorizedClientService customOAuth2AuthorizedClientService;
 
+    /**
+     * Endpoints the WhatsApp bridge (a backend-to-backend caller without a session) pushes data
+     * to. Only these are anonymous and CSRF-exempt; the frontend-facing bridge proxies (/qr,
+     * /logout, /reset) need a signed-in user and, for POSTs, the CSRF token.
+     */
+    static final String[] BRIDGE_INGEST_ENDPOINTS = {
+        "/api/whatsapp/bridge/chat",
+        "/api/whatsapp/bridge/message",
+        "/api/whatsapp/bridge/chat-preview",
+        "/api/whatsapp/bridge/contact-name",
+        "/api/whatsapp/bridge/clear-all",
+    };
+
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
@@ -51,7 +64,7 @@ public class SecurityConfig {
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                 .csrfTokenRequestHandler(requestHandler)
                 .ignoringRequestMatchers("/api/whatsapp/webhook")
-                .ignoringRequestMatchers("/api/whatsapp/bridge/**")
+                .ignoringRequestMatchers(BRIDGE_INGEST_ENDPOINTS)
             )
             .addFilterAfter(new OncePerRequestFilter() {
                 @Override
@@ -68,7 +81,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/profile").permitAll()
                 .requestMatchers("/api/auth/google/start").permitAll()
                 .requestMatchers("/api/whatsapp/webhook").permitAll()
-                .requestMatchers("/api/whatsapp/bridge/**").permitAll()
+                .requestMatchers(BRIDGE_INGEST_ENDPOINTS).permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/whatsapp/bridge/status").permitAll()
                 .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated()
             )

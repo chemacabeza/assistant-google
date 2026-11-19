@@ -2,7 +2,6 @@ package com.assistant.config;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -150,15 +149,16 @@ class ConfigControllerTest {
     }
 
     @Test
-    @Disabled("BUG: saveEnv writes values verbatim, so a value containing a newline injects arbitrary extra "
-            + "lines (e.g. SPRING_DATASOURCE_URL or TOKEN_ENCRYPTION_KEY) into .env, bypassing the configurable-keys "
-            + "allow-list. Values should be rejected or sanitised when they contain CR/LF.")
     @DisplayName("saveEnv cannot be used to inject non-configurable keys through a newline in a value")
     void newlineInjection() throws IOException {
         Files.write(envFile, List.of("OPENAI_API_KEY=old"));
 
-        controller.saveEnv(Map.of("OPENAI_API_KEY", "sk-new\nSPRING_DATASOURCE_URL=jdbc:postgresql://attacker/db"));
+        Map<String, Object> result = controller.saveEnv(
+                Map.of("OPENAI_API_KEY", "sk-new\nSPRING_DATASOURCE_URL=jdbc:postgresql://attacker/db"));
+        controller.saveEnv(Map.of("VITE_GOOGLE_MAPS_API_KEY", "k\rTOKEN_ENCRYPTION_KEY=x"));
 
-        assertThat(Files.readAllLines(envFile)).noneMatch(line -> line.startsWith("SPRING_DATASOURCE_URL="));
+        assertThat(result).containsEntry("success", false)
+                .containsEntry("message", "Values cannot contain line breaks: OPENAI_API_KEY");
+        assertThat(Files.readAllLines(envFile)).containsExactly("OPENAI_API_KEY=old");
     }
 }

@@ -96,12 +96,27 @@ class RepositoryQueriesTest {
     }
 
     @Test
-    @DisplayName("LinkedAccountRepository.existsByEmail")
-    void linkedAccountExists() {
-        linkedAccountRepository.save(new LinkedAccount("work@example.com", "Work"));
+    @DisplayName("LinkedAccountRepository scopes accounts to their owner and adopts legacy unowned rows")
+    void linkedAccountsPerOwner() {
+        LinkedAccount aliceWork = new LinkedAccount("work@example.com", "Work");
+        aliceWork.setOwnerEmail("alice@example.com");
+        linkedAccountRepository.save(aliceWork);
+        LinkedAccount bobHome = new LinkedAccount("home@example.com", "Home");
+        bobHome.setOwnerEmail("bob@example.com");
+        linkedAccountRepository.save(bobHome);
+        linkedAccountRepository.save(new LinkedAccount("legacy@example.com", "Legacy")); // no owner yet
 
-        assertThat(linkedAccountRepository.existsByEmail("work@example.com")).isTrue();
-        assertThat(linkedAccountRepository.existsByEmail("home@example.com")).isFalse();
+        assertThat(linkedAccountRepository.existsByOwnerEmailAndEmail("alice@example.com", "work@example.com")).isTrue();
+        assertThat(linkedAccountRepository.existsByOwnerEmailAndEmail("bob@example.com", "work@example.com")).isFalse();
+        assertThat(linkedAccountRepository.findByIdAndOwnerEmail(bobHome.getId(), "alice@example.com")).isEmpty();
+
+        assertThat(linkedAccountRepository.claimUnowned("alice@example.com")).isEqualTo(1);
+        em.clear();
+        assertThat(linkedAccountRepository.findByOwnerEmailOrderByIdAsc("alice@example.com"))
+                .extracting(LinkedAccount::getEmail).containsExactly("work@example.com", "legacy@example.com");
+        assertThat(linkedAccountRepository.findByOwnerEmailOrderByIdAsc("bob@example.com"))
+                .extracting(LinkedAccount::getEmail).containsExactly("home@example.com");
+        assertThat(linkedAccountRepository.claimUnowned("bob@example.com")).isZero();
     }
 
     // ── OAuth tokens ───────────────────────────────────────────────────────

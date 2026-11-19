@@ -13,6 +13,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -32,25 +33,27 @@ class LinkedAccountControllerTest extends WebMvcSecurityTest {
     private LinkedAccountService service;
 
     @Test
-    @DisplayName("GET lists linked accounts")
+    @DisplayName("GET lists the signed-in user's linked accounts without exposing the owner")
     void list() throws Exception {
         LinkedAccount a = new LinkedAccount("a@example.com", "A");
         a.setId(1L);
-        when(service.getAllAccounts()).thenReturn(List.of(a));
+        a.setOwnerEmail("owner@example.com");
+        when(service.getAccounts("owner@example.com")).thenReturn(List.of(a));
 
         mockMvc.perform(get("/api/accounts").with(user()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].id").value(1))
-                .andExpect(jsonPath("$[0].email").value("a@example.com"));
+                .andExpect(jsonPath("$[0].email").value("a@example.com"))
+                .andExpect(jsonPath("$[0].ownerEmail").doesNotExist());
     }
 
     @Test
-    @DisplayName("POST adds an account")
+    @DisplayName("POST adds an account for the signed-in user")
     void add() throws Exception {
         LinkedAccount saved = new LinkedAccount("b@example.com", "B");
         saved.setId(2L);
-        when(service.addAccount(any())).thenReturn(saved);
+        when(service.addAccount(eq("owner@example.com"), any())).thenReturn(saved);
 
         mockMvc.perform(post("/api/accounts").with(user()).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"b@example.com\",\"name\":\"B\"}"))
@@ -58,14 +61,14 @@ class LinkedAccountControllerTest extends WebMvcSecurityTest {
                 .andExpect(jsonPath("$.id").value(2));
 
         ArgumentCaptor<LinkedAccount> captor = ArgumentCaptor.forClass(LinkedAccount.class);
-        verify(service).addAccount(captor.capture());
+        verify(service).addAccount(eq("owner@example.com"), captor.capture());
         assertThat(captor.getValue().getEmail()).isEqualTo("b@example.com");
     }
 
     @Test
     @DisplayName("POST of a duplicate answers 400 with the reason as plain text")
     void addDuplicate() throws Exception {
-        when(service.addAccount(any())).thenThrow(new IllegalArgumentException("Account with this email already exists"));
+        when(service.addAccount(any(), any())).thenThrow(new IllegalArgumentException("Account with this email already exists"));
 
         mockMvc.perform(post("/api/accounts").with(user()).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"dup@example.com\"}"))
@@ -74,11 +77,20 @@ class LinkedAccountControllerTest extends WebMvcSecurityTest {
     }
 
     @Test
-    @DisplayName("DELETE removes the account by id")
+    @DisplayName("DELETE removes the signed-in user's account by id")
     void remove() throws Exception {
-        mockMvc.perform(delete("/api/accounts/4").with(user()).with(csrf())).andExpect(status().isOk());
+        when(service.deleteAccount("owner@example.com", 4L)).thenReturn(true);
 
-        verify(service).deleteAccount(4L);
+        mockMvc.perform(delete("/api/accounts/4").with(user()).with(csrf())).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("DELETE of another user's (or a missing) account answers 404")
+    void removeForeign() throws Exception {
+        when(service.deleteAccount("intruder@example.com", 4L)).thenReturn(false);
+
+        mockMvc.perform(delete("/api/accounts/4").with(user("intruder@example.com")).with(csrf()))
+                .andExpect(status().isNotFound());
     }
 
     @Test

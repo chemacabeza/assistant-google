@@ -1,192 +1,121 @@
 package com.assistant.account;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("LinkedAccountService - Account Management Tests")
+@DisplayName("LinkedAccountService - per-user linked accounts")
 class LinkedAccountServiceTest {
 
+    private static final String OWNER = "owner@example.com";
+
     @Mock
-    private LinkedAccountRepository linkedAccountRepository;
+    private LinkedAccountRepository repository;
 
     @InjectMocks
-    private LinkedAccountService linkedAccountService;
+    private LinkedAccountService service;
 
-    private LinkedAccount testAccount1;
-    private LinkedAccount testAccount2;
-
-    @BeforeEach
-    void setUp() {
-        testAccount1 = new LinkedAccount("test1@example.com", "Test Account 1");
-        testAccount1.setId(1L);
-
-        testAccount2 = new LinkedAccount("test2@example.com", "Test Account 2");
-        testAccount2.setId(2L);
+    private static LinkedAccount account(Long id, String email, String owner) {
+        LinkedAccount a = new LinkedAccount(email, email);
+        a.setId(id);
+        a.setOwnerEmail(owner);
+        return a;
     }
 
     @Test
-    @DisplayName("Should retrieve all accounts successfully")
-    void testGetAllAccounts() {
-        // Arrange
-        List<LinkedAccount> expectedAccounts = Arrays.asList(testAccount1, testAccount2);
-        when(linkedAccountRepository.findAll()).thenReturn(expectedAccounts);
+    @DisplayName("getAccounts adopts legacy unowned rows, then lists only the owner's accounts")
+    void getAccounts() {
+        List<LinkedAccount> mine = List.of(account(1L, "a@example.com", OWNER));
+        when(repository.findByOwnerEmailOrderByIdAsc(OWNER)).thenReturn(mine);
 
-        // Act
-        List<LinkedAccount> result = linkedAccountService.getAllAccounts();
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(2, result.size());
-        assertEquals("test1@example.com", result.get(0).getEmail());
-        assertEquals("test2@example.com", result.get(1).getEmail());
-        verify(linkedAccountRepository, times(1)).findAll();
+        assertThat(service.getAccounts(OWNER)).isEqualTo(mine);
+        verify(repository).claimUnowned(OWNER);
     }
 
     @Test
-    @DisplayName("Should return empty list when no accounts exist")
-    void testGetAllAccountsEmpty() {
-        // Arrange
-        when(linkedAccountRepository.findAll()).thenReturn(Collections.emptyList());
+    @DisplayName("addAccount stamps the owner and ignores any client-supplied id")
+    void addAccount() {
+        when(repository.existsByOwnerEmailAndEmail(OWNER, "new@example.com")).thenReturn(false);
+        when(repository.save(any(LinkedAccount.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        // Act
-        List<LinkedAccount> result = linkedAccountService.getAllAccounts();
+        LinkedAccount saved = service.addAccount(OWNER, account(99L, "new@example.com", "someone-else@example.com"));
 
-        // Assert
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
-        verify(linkedAccountRepository, times(1)).findAll();
+        assertThat(saved.getId()).isNull();
+        assertThat(saved.getOwnerEmail()).isEqualTo(OWNER);
+        assertThat(saved.getEmail()).isEqualTo("new@example.com");
     }
 
     @Test
-    @DisplayName("Should add a new account successfully")
-    void testAddAccountSuccess() {
-        // Arrange
-        when(linkedAccountRepository.existsByEmail("newaccount@example.com")).thenReturn(false);
-        when(linkedAccountRepository.save(any(LinkedAccount.class))).thenReturn(testAccount1);
+    @DisplayName("addAccount rejects an address the owner already linked")
+    void addDuplicate() {
+        when(repository.existsByOwnerEmailAndEmail(OWNER, "dup@example.com")).thenReturn(true);
 
-        LinkedAccount newAccount = new LinkedAccount("newaccount@example.com", "New Account");
-
-        // Act
-        LinkedAccount result = linkedAccountService.addAccount(newAccount);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals("test1@example.com", result.getEmail());
-        verify(linkedAccountRepository, times(1)).existsByEmail("newaccount@example.com");
-        verify(linkedAccountRepository, times(1)).save(any(LinkedAccount.class));
+        assertThatThrownBy(() -> service.addAccount(OWNER, new LinkedAccount("dup@example.com", "Dup")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Account with this email already exists");
+        verify(repository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Should throw exception when adding duplicate account")
-    void testAddAccountDuplicate() {
-        // Arrange
-        when(linkedAccountRepository.existsByEmail("duplicate@example.com")).thenReturn(true);
+    @DisplayName("deleteAccount removes only the owner's own account")
+    void deleteOwn() {
+        LinkedAccount mine = account(4L, "a@example.com", OWNER);
+        when(repository.findByIdAndOwnerEmail(4L, OWNER)).thenReturn(Optional.of(mine));
 
-        LinkedAccount duplicateAccount = new LinkedAccount("duplicate@example.com", "Duplicate");
-
-        // Act & Assert
-        assertThrows(IllegalArgumentException.class, () -> {
-            linkedAccountService.addAccount(duplicateAccount);
-        });
-
-        verify(linkedAccountRepository, times(1)).existsByEmail("duplicate@example.com");
-        verify(linkedAccountRepository, never()).save(any());
+        assertThat(service.deleteAccount(OWNER, 4L)).isTrue();
+        verify(repository).delete(mine);
     }
 
     @Test
-    @DisplayName("Should delete account by ID")
-    void testDeleteAccountSuccess() {
-        // Arrange
-        Long accountId = 1L;
+    @DisplayName("deleteAccount leaves other users' accounts alone")
+    void deleteForeign() {
+        when(repository.findByIdAndOwnerEmail(5L, OWNER)).thenReturn(Optional.empty());
 
-        // Act
-        linkedAccountService.deleteAccount(accountId);
-
-        // Assert
-        verify(linkedAccountRepository, times(1)).deleteById(1L);
+        assertThat(service.deleteAccount(OWNER, 5L)).isFalse();
+        verify(repository, never()).delete(any());
+        verify(repository, never()).deleteById(any());
     }
 
     @Test
-    @DisplayName("Should save account with null ID")
-    void testAddAccountWithNullId() {
-        // Arrange
-        LinkedAccount newAccount = new LinkedAccount("email@example.com", "Account");
-        newAccount.setId(null); // Explicitly set null ID
+    @DisplayName("ensureLinked links the signed-in address to itself once")
+    void ensureLinked() {
+        when(repository.existsByOwnerEmailAndEmail("new@example.com", "new@example.com")).thenReturn(false);
 
-        when(linkedAccountRepository.existsByEmail("email@example.com")).thenReturn(false);
-        when(linkedAccountRepository.save(any(LinkedAccount.class))).thenReturn(newAccount);
+        service.ensureLinked("new@example.com", " ");
 
-        // Act
-        LinkedAccount result = linkedAccountService.addAccount(newAccount);
-
-        // Assert
-        assertNotNull(result);
-        assertNull(result.getId());
-        verify(linkedAccountRepository, times(1)).save(any());
+        ArgumentCaptor<LinkedAccount> captor = ArgumentCaptor.forClass(LinkedAccount.class);
+        verify(repository).claimUnowned("new@example.com");
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getEmail()).isEqualTo("new@example.com");
+        assertThat(captor.getValue().getName()).isEqualTo("new@example.com");
+        assertThat(captor.getValue().getOwnerEmail()).isEqualTo("new@example.com");
     }
 
     @Test
-    @DisplayName("Should handle multiple calls to add accounts")
-    void testAddMultipleAccounts() {
-        // Arrange
-        when(linkedAccountRepository.existsByEmail(anyString())).thenReturn(false);
-        when(linkedAccountRepository.save(any(LinkedAccount.class)))
-            .thenReturn(testAccount1)
-            .thenReturn(testAccount2);
+    @DisplayName("ensureLinked does nothing for an already linked or blank address")
+    void ensureLinkedNoop() {
+        when(repository.existsByOwnerEmailAndEmail(OWNER, OWNER)).thenReturn(true);
+        service.ensureLinked(OWNER, "Owner");
+        verify(repository, never()).save(any());
 
-        LinkedAccount acc1 = new LinkedAccount("test1@example.com", "Account 1");
-        LinkedAccount acc2 = new LinkedAccount("test2@example.com", "Account 2");
-
-        // Act
-        linkedAccountService.addAccount(acc1);
-        linkedAccountService.addAccount(acc2);
-
-        // Assert
-        verify(linkedAccountRepository, times(2)).existsByEmail(anyString());
-        verify(linkedAccountRepository, times(2)).save(any());
-    }
-
-    @Test
-    @DisplayName("Should pass correct email to existsByEmail check")
-    void testAddAccountChecksCorrectEmail() {
-        // Arrange
-        String emailToAdd = "specific@example.com";
-        when(linkedAccountRepository.existsByEmail(emailToAdd)).thenReturn(false);
-        when(linkedAccountRepository.save(any(LinkedAccount.class))).thenReturn(testAccount1);
-
-        LinkedAccount newAccount = new LinkedAccount(emailToAdd, "Test");
-
-        // Act
-        linkedAccountService.addAccount(newAccount);
-
-        // Assert
-        verify(linkedAccountRepository, times(1)).existsByEmail(emailToAdd);
-    }
-
-    @Test
-    @DisplayName("Should delete account with specific ID")
-    void testDeleteAccountWithSpecificId() {
-        // Arrange
-        Long specificId = 42L;
-
-        // Act
-        linkedAccountService.deleteAccount(specificId);
-
-        // Assert
-        verify(linkedAccountRepository, times(1)).deleteById(42L);
+        LinkedAccountRepository untouched = org.mockito.Mockito.mock(LinkedAccountRepository.class);
+        new LinkedAccountService(untouched).ensureLinked(" ", "x");
+        verifyNoInteractions(untouched);
     }
 }

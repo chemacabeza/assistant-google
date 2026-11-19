@@ -88,6 +88,18 @@ public class ConfigController {
             "WHATSAPP_VERIFY_TOKEN"
         );
 
+        // One line per variable: a line break in a value would smuggle extra (non-configurable)
+        // variables into .env, so such updates are refused before anything is written.
+        List<String> multiLine = updates.entrySet().stream()
+            .filter(e -> configurableKeys.contains(e.getKey()))
+            .filter(e -> e.getValue() != null && (e.getValue().contains("\n") || e.getValue().contains("\r")))
+            .map(Map.Entry::getKey)
+            .sorted()
+            .toList();
+        if (!multiLine.isEmpty()) {
+            return Map.of("success", false, "message", "Values cannot contain line breaks: " + String.join(", ", multiLine));
+        }
+
         try {
             List<String> existingLines = Files.exists(envPath)
                 ? new ArrayList<>(Files.readAllLines(envPath))

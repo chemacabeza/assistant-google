@@ -1,5 +1,6 @@
 package com.assistant.account;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,6 +17,10 @@ public class LinkedAccount {
 
     private String email;
     private String name;
+
+    /** Email of the signed-in user who linked this address; accounts are private to their owner. */
+    @JsonIgnore
+    private String ownerEmail;
 
     public LinkedAccount() {
     }
@@ -39,6 +44,14 @@ public class LinkedAccount {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getOwnerEmail() {
+        return ownerEmail;
+    }
+
+    public void setOwnerEmail(String ownerEmail) {
+        this.ownerEmail = ownerEmail;
     }
 
     public String getName() {
