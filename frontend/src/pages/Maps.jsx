@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, Autocomplete } from '@react-google-maps/api';
-import { MapPin, Search } from 'lucide-react';
+import { MapPin, Search, Car } from 'lucide-react';
+import { buildUberLink } from '../utils/uber';
 
 const containerStyle = {
   width: '100%',
@@ -25,6 +26,7 @@ const Maps = () => {
   const [mapCenter, setMapCenter] = useState(defaultCenter);
   const [markerPosition, setMarkerPosition] = useState(defaultCenter);
   const [autocomplete, setAutocomplete] = useState(null);
+  const [selectedPlace, setSelectedPlace] = useState(null);
 
   const onLoad = useCallback(function callback(map) {
     // Optionally bounds configuration
@@ -47,6 +49,12 @@ const Maps = () => {
         const newLng = place.geometry.location.lng();
         setMapCenter({ lat: newLat, lng: newLng });
         setMarkerPosition({ lat: newLat, lng: newLng });
+        setSelectedPlace({
+          lat: newLat,
+          lng: newLng,
+          address: place.formatted_address || place.name,
+          nickname: place.name,
+        });
         if (map) {
            map.panTo({ lat: newLat, lng: newLng });
            map.setZoom(14);
@@ -107,6 +115,16 @@ const Maps = () => {
             <div className="animate-spin inline-block w-8 h-8 border-[3px] border-blue-200 border-t-blue-600 rounded-full mb-4"></div>
             <p className="text-slate-500 font-medium">Initializing Google Maps Platform...</p>
           </div>
+        )}
+        {isLoaded && selectedPlace && (
+          <a
+            href={buildUberLink({ dropoff: selectedPlace })}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-3 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 hover:bg-gray-800 transition-colors"
+          >
+            <Car size={18} /> Ride with Uber to {selectedPlace.nickname || 'this place'}
+          </a>
         )}
       </div>
     </div>

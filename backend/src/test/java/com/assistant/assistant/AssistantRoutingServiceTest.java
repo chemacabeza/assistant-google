@@ -6,6 +6,7 @@ import com.assistant.contacts.ContactsService.ContactDto;
 import com.assistant.gmail.GmailService;
 import com.assistant.maps.MapsService;
 import com.assistant.testsupport.StubExchangeFunction;
+import com.assistant.uber.UberService;
 import com.assistant.whatsapp.WhatsAppService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -47,6 +48,7 @@ class AssistantRoutingServiceTest {
     @Mock private MapsService mapsService;
     @Mock private ContactsService contactsService;
     @Mock private WhatsAppService whatsAppService;
+    @Mock private UberService uberService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private StubExchangeFunction openAi;
@@ -56,7 +58,7 @@ class AssistantRoutingServiceTest {
     void setUp() {
         openAi = new StubExchangeFunction();
         service = new AssistantRoutingService(openAi.webClientBuilder(), gmailService, calendarService, mapsService,
-                contactsService, whatsAppService, objectMapper);
+                contactsService, whatsAppService, uberService, objectMapper);
         ReflectionTestUtils.setField(service, "openAiApiKey", "sk-test");
     }
 
@@ -157,7 +159,7 @@ class AssistantRoutingServiceTest {
         }
 
         @Test
-        @DisplayName("Advertises all eight internal tools")
+        @DisplayName("Advertises all nine internal tools")
         @SuppressWarnings("unchecked")
         void advertisesTools() throws Exception {
             openAi.enqueueJson(FINAL_ANSWER);
@@ -168,7 +170,7 @@ class AssistantRoutingServiceTest {
             assertThat(tools).extracting(t -> ((Map<String, Object>) t.get("function")).get("name"))
                     .containsExactlyInAnyOrder("fetch_recent_emails", "fetch_upcoming_meetings",
                             "calculate_travel_duration", "schedule_calendar_event", "search_google_contacts",
-                            "send_email", "delete_calendar_event", "send_whatsapp_message");
+                            "send_email", "delete_calendar_event", "send_whatsapp_message", "get_uber_ride_link");
             assertThat(tools).allSatisfy(t -> assertThat(t).containsEntry("type", "function"));
         }
     }
@@ -296,6 +298,18 @@ class AssistantRoutingServiceTest {
             runTool("calculate_travel_duration", Map.of("origin", "Home", "destination", "Office", "travelMode", "transit"));
 
             assertThat(toolResultContent()).isEqualTo("{\"status\":\"OK\"}");
+        }
+
+        @Test
+        @DisplayName("get_uber_ride_link forwards pickup, dropoff and nickname to UberService")
+        void getUberRideLink() throws Exception {
+            when(uberService.buildRideLink(null, "Berlin Hbf", "Station"))
+                    .thenReturn(new UberService.RideLink("https://m.uber.com/ul/?action=setPickup", "Current location", "Berlin Hbf", false, true));
+
+            runTool("get_uber_ride_link", Map.of("dropoff", "Berlin Hbf", "dropoffNickname", "Station"));
+
+            assertThat(toolResultContent()).contains("\"url\":\"https://m.uber.com/ul/?action=setPickup\"")
+                    .contains("\"dropoff\":\"Berlin Hbf\"");
         }
 
         @Test

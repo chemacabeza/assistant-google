@@ -19,7 +19,7 @@ A production-ready full-stack application connecting securely to your Google Acc
 
 | Path | What lives there |
 | :--- | :--- |
-| `backend/` | Spring Boot API: OAuth2 login, Google integrations, assistant routing, WhatsApp ingest, scheduled emails |
+| `backend/` | Spring Boot API: OAuth2 login, Google integrations, assistant routing, WhatsApp ingest, scheduled emails, Uber ride links |
 | `frontend/` | React single-page app (Dashboard, Assistant, Gmail, Calendar, Drive, Photos, Maps, WhatsApp, Templates, Configuration) |
 | `whatsapp-bridge/` | Node service that links a WhatsApp account by QR code and pushes chats/messages to the backend |
 | `e2e/` | Playwright suite, mock Google OIDC provider and the isolated `docker-compose.e2e.yml` override |
@@ -45,6 +45,7 @@ This application integrates with the following external services. You must creat
 | **Maps JavaScript API** | Render interactive maps in the browser | [Enable Maps API](https://console.cloud.google.com/apis/library/maps-backend.googleapis.com) |
 | **Maps Directions API** | Calculate driving routes and durations | [Enable Directions API](https://console.cloud.google.com/apis/library/directions-backend.googleapis.com) |
 | **Places API** | Autocomplete and place search functionality | [Enable Places API](https://console.cloud.google.com/apis/library/places-backend.googleapis.com) |
+| **Geocoding API** | Turns addresses into coordinates for Uber ride links | [Enable Geocoding API](https://console.cloud.google.com/apis/library/geocoding-backend.googleapis.com) |
 | **Google OAuth 2.0** | User authentication and authorization | [OAuth Credentials](https://console.cloud.google.com/apis/credentials) |
 | **OpenAI API** | AI assistant intent parsing and responses | [Get API Key](https://platform.openai.com/api-keys) |
 
@@ -170,6 +171,15 @@ The application features a built-in WhatsApp bridge that connects directly to th
 4.  **AI Assistant Tooling**:
     *   The AI Assistant can now natively send messages through your linked account. You can ask: *"Send a WhatsApp to Carlos saying I'm running late."*
 
+### 5. Uber
+
+The app connects to Uber through Uber's [deep links](https://developer.uber.com/docs/riders/ride-requests/tutorials/deep-links/introduction). No Uber account linking or credentials are needed. Uber's ride-request API is limited to approved partners, so the app does not book rides itself. It opens the Uber app (or `m.uber.com` on desktop) with the pickup and drop-off already filled in, and you confirm the ride there.
+
+*   **Maps page**: search for a place, then click **Ride with Uber to …**.
+*   **Calendar page**: every event with a location has a **Ride with Uber** button.
+*   **Assistant**: ask *"Get me an Uber to Berlin Hauptbahnhof"* or *"Pídeme un Uber al aeropuerto desde la oficina"*. The assistant replies with an *Open in Uber* link.
+
+Pickup defaults to your device's current location. The backend geocodes addresses with the Google **Geocoding API** using `VITE_GOOGLE_MAPS_API_KEY`, so enable that API for the key. Without it the link still carries the address text, but Uber may ask you to confirm the destination. The endpoint is `GET /api/uber/ride-link?dropoff=…[&pickup=…][&nickname=…]`.
 
 ## Testing
 
@@ -193,4 +203,4 @@ The GitHub Actions workflow in `.github/workflows/ci.yml` runs all of these on e
 6. **CSRF**: State-changing requests must echo the `XSRF-TOKEN` cookie in the `X-XSRF-TOKEN` header. Only the bridge ingest endpoints and the Meta webhook are exempt.
 
 ## How the Assistant Works
-`AssistantRoutingService` sends the conversation to OpenAI (`gpt-4o-mini`) with a set of function-calling tools backed by the Google and WhatsApp services: `fetch_recent_emails`, `fetch_upcoming_meetings`, `calculate_travel_duration`, `schedule_calendar_event`, `delete_calendar_event`, `search_google_contacts`, `send_email` and `send_whatsapp_message`. Tool calls are executed on the backend and their results fed back to the model until it produces a final answer. Rate-limit responses are retried with exponential backoff. To use another provider or model, change the request in `callOpenAiWithRetry` and the `model` field in `callOpenAiWithTools`; the tool definitions and executors are provider-agnostic JSON. The same service answers Telegram messages when `TELEGRAM_BOT_TOKEN` is set.
+`AssistantRoutingService` sends the conversation to OpenAI (`gpt-4o-mini`) with a set of function-calling tools backed by the Google and WhatsApp services: `fetch_recent_emails`, `fetch_upcoming_meetings`, `calculate_travel_duration`, `schedule_calendar_event`, `delete_calendar_event`, `search_google_contacts`, `send_email`, `send_whatsapp_message` and `get_uber_ride_link`. Tool calls are executed on the backend and their results fed back to the model until it produces a final answer. Rate-limit responses are retried with exponential backoff. To use another provider or model, change the request in `callOpenAiWithRetry` and the `model` field in `callOpenAiWithTools`; the tool definitions and executors are provider-agnostic JSON. The same service answers Telegram messages when `TELEGRAM_BOT_TOKEN` is set.

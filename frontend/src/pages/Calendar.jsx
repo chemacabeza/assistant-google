@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Calendar as CalendarIcon, MapPin, Clock, Plus, X } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin, Clock, Plus, X, Car } from 'lucide-react';
 import { api } from '../api/axios';
 import { useAuthStore } from '../store/useAuthStore';
+import { openUberRide } from '../utils/uber';
 
 const Calendar = () => {
   const { user } = useAuthStore();
@@ -146,6 +147,14 @@ const Calendar = () => {
                   >
                     Send Invite
                   </button>
+                  {event.location && (
+                    <button
+                      onClick={() => openUberRide(event.location, event.summary)}
+                      className="text-xs font-semibold text-white bg-black px-3 py-1.5 rounded flex-shrink-0 hover:bg-gray-800 transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Car size={14} /> Ride with Uber
+                    </button>
+                  )}
                   {event.htmlLink && (
                     <a href={event.htmlLink} target="_blank" rel="noreferrer" className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded flex-shrink-0 hover:bg-indigo-100 transition-colors text-center">
                       View in Calendar

@@ -145,6 +145,43 @@ describe('Calendar page', () => {
     await waitFor(() => expect(alert).toHaveBeenCalledWith(expect.stringMatching(/^Failed to send invite: /)));
   });
 
+  it('opens Uber with a geocoded ride link to the event location', async () => {
+    const tab = { opener: 'app', location: { href: '' }, close: vi.fn() };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab);
+    const rideParams = [];
+    mockCalendar([standup, { id: 'ev2', summary: 'No place', start: { date: '2026-10-10' } }]);
+    server.use(http.get('/api/uber/ride-link', ({ request }) => {
+      rideParams.push(new URL(request.url).searchParams);
+      return HttpResponse.json({ url: 'https://m.uber.com/ul/?action=setPickup&dropoff%5Blatitude%5D=1' });
+    }));
+    const { user } = renderWithProviders(<Calendar />);
+
+    const buttons = await screen.findAllByRole('button', { name: /ride with uber/i });
+    expect(buttons).toHaveLength(1); // only events with a location
+    await user.click(buttons[0]);
+
+    expect(open).toHaveBeenCalledWith('', '_blank');
+    await waitFor(() => expect(tab.location.href).toBe('https://m.uber.com/ul/?action=setPickup&dropoff%5Blatitude%5D=1'));
+    expect(tab.opener).toBeNull();
+    expect(rideParams[0].get('dropoff')).toBe('Room 42');
+    expect(rideParams[0].get('nickname')).toBe('Standup');
+  });
+
+  it('closes the blank tab and reports when the Uber link cannot be built', async () => {
+    const tab = { opener: 'app', location: { href: '' }, close: vi.fn() };
+    vi.spyOn(window, 'open').mockReturnValue(tab);
+    const alert = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    mockCalendar([standup]);
+    server.use(http.get('/api/uber/ride-link', () => HttpResponse.json({ message: 'boom' }, { status: 502 })));
+    const { user } = renderWithProviders(<Calendar />);
+
+    await user.click(await screen.findByRole('button', { name: /ride with uber/i }));
+
+    await waitFor(() => expect(alert).toHaveBeenCalledWith('Could not open Uber: boom'));
+    expect(tab.close).toHaveBeenCalled();
+    expect(tab.location.href).toBe('');
+  });
+
   // BUG: the "Send invite to" prompt is pre-filled with a hard-coded third-party personal
   // address. Pressing Enter sends the event to a stranger. Same class of
   // problem as commit 080b9c8 (seeded personal addresses). The default should be empty.

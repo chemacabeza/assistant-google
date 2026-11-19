@@ -78,4 +78,35 @@ class MapsServiceTest {
         assertThat(result).asInstanceOf(InstanceOfAssertFactories.MAP)
                 .hasEntrySatisfying("error", e -> assertThat((String) e).startsWith("Failed to interface with Maps Platform:"));
     }
+
+    @Test
+    @DisplayName("geocode returns coordinates and the formatted address of the first result")
+    void geocodeSuccess() {
+        http.enqueueJson("""
+                {"status":"OK","results":[{"formatted_address":"Alexanderplatz, 10178 Berlin, Germany",
+                  "geometry":{"location":{"lat":52.5219,"lng":13.4132}}}]}
+                """);
+
+        var point = mapsService.geocode("Alexanderplatz & more");
+
+        assertThat(http.lastRequest().uri().getPath()).isEqualTo("/maps/api/geocode/json");
+        assertThat(http.lastRequest().queryParam("address")).isEqualTo("Alexanderplatz & more");
+        assertThat(http.lastRequest().queryParam("key")).isEqualTo("maps-key");
+        assertThat(point).contains(new MapsService.GeoPoint(52.5219, 13.4132, "Alexanderplatz, 10178 Berlin, Germany"));
+    }
+
+    @Test
+    @DisplayName("geocode is empty for ZERO_RESULTS, upstream errors, blank input or a missing key")
+    void geocodeEmpty() {
+        http.enqueueJson("{\"status\":\"ZERO_RESULTS\",\"results\":[]}");
+        assertThat(mapsService.geocode("nowhere")).isEmpty();
+
+        http.enqueue(HttpStatus.SERVICE_UNAVAILABLE, "{}");
+        assertThat(mapsService.geocode("somewhere")).isEmpty();
+
+        assertThat(mapsService.geocode(" ")).isEmpty();
+        ReflectionTestUtils.setField(mapsService, "mapsApiKey", "");
+        assertThat(mapsService.geocode("somewhere")).isEmpty();
+        assertThat(http.requests()).hasSize(2);
+    }
 }

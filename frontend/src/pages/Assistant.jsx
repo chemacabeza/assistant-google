@@ -84,7 +84,7 @@ const Assistant = () => {
                          ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-3 space-y-1" {...props} />,
                          li: ({node, ...props}) => <li className="pl-1" {...props} />,
                          hr: ({node, ...props}) => <hr className="my-4 border-gray-200" {...props} />,
-                         a: ({node, ...props}) => <a className="text-blue-600 hover:underline font-medium" {...props} />
+                         a: ({node, ...props}) => <a className="text-blue-600 hover:underline font-medium" target="_blank" rel="noopener noreferrer" {...props} />
                        }}
                     >
                       {msg.text}

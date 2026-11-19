@@ -86,4 +86,25 @@ describe('Maps page', () => {
     expect(JSON.parse(screen.getByTestId('marker').dataset.position)).toEqual({ lat: 37.7749, lng: -122.4194 });
     expect(maps.mapInstance.panTo).not.toHaveBeenCalled();
   });
+
+  it('offers a Ride with Uber link to the selected place', () => {
+    renderWithProviders(<Maps />);
+    expect(screen.queryByRole('link', { name: /ride with uber/i })).not.toBeInTheDocument();
+    maps.autocomplete.getPlace.mockReturnValue({
+      name: 'Eiffel Tower',
+      formatted_address: 'Av. Gustave Eiffel, 75007 Paris, France',
+      geometry: { location: { lat: () => 48.8584, lng: () => 2.2945 } },
+    });
+
+    act(() => maps.autocompleteProps.onPlaceChanged());
+
+    const link = screen.getByRole('link', { name: 'Ride with Uber to Eiffel Tower' });
+    expect(link).toHaveAttribute('target', '_blank');
+    const url = new URL(link.getAttribute('href'));
+    expect(url.origin + url.pathname).toBe('https://m.uber.com/ul/');
+    expect(url.searchParams.get('pickup')).toBe('my_location');
+    expect(url.searchParams.get('dropoff[latitude]')).toBe('48.8584');
+    expect(url.searchParams.get('dropoff[longitude]')).toBe('2.2945');
+    expect(url.searchParams.get('dropoff[formatted_address]')).toBe('Av. Gustave Eiffel, 75007 Paris, France');
+  });
 });
