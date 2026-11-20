@@ -23,12 +23,12 @@ class UberControllerTest extends WebMvcSecurityTest {
     @DisplayName("GET /ride-link returns the deep link for the given trip")
     void rideLink() throws Exception {
         when(uberService.buildRideLink("Home", "Office", "Work"))
-                .thenReturn(new UberService.RideLink("https://m.uber.com/ul/?action=setPickup", "Home", "Office", true, true));
+                .thenReturn(new UberService.RideLink("https://m.uber.com/looking?drop%5B0%5D=x", "Home", "Office", true, true));
 
         mockMvc.perform(get("/api/uber/ride-link")
                         .param("pickup", "Home").param("dropoff", "Office").param("nickname", "Work").with(user()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.url").value("https://m.uber.com/ul/?action=setPickup"))
+                .andExpect(jsonPath("$.url").value("https://m.uber.com/looking?drop%5B0%5D=x"))
                 .andExpect(jsonPath("$.dropoff").value("Office"))
                 .andExpect(jsonPath("$.dropoffGeocoded").value(true));
     }

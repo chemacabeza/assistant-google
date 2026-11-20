@@ -101,10 +101,13 @@ describe('Maps page', () => {
     const link = screen.getByRole('link', { name: 'Ride with Uber to Eiffel Tower' });
     expect(link).toHaveAttribute('target', '_blank');
     const url = new URL(link.getAttribute('href'));
-    expect(url.origin + url.pathname).toBe('https://m.uber.com/ul/');
-    expect(url.searchParams.get('pickup')).toBe('my_location');
-    expect(url.searchParams.get('dropoff[latitude]')).toBe('48.8584');
-    expect(url.searchParams.get('dropoff[longitude]')).toBe('2.2945');
-    expect(url.searchParams.get('dropoff[formatted_address]')).toBe('Av. Gustave Eiffel, 75007 Paris, France');
+    expect(url.origin + url.pathname).toBe('https://m.uber.com/looking');
+    expect(url.searchParams.get('pickup')).toBeNull(); // Uber uses the rider's location
+    expect(JSON.parse(url.searchParams.get('drop[0]'))).toEqual({
+      latitude: 48.8584,
+      longitude: 2.2945,
+      addressLine1: 'Eiffel Tower',
+      addressLine2: 'Av. Gustave Eiffel, 75007 Paris, France',
+    });
   });
 });

@@ -2,6 +2,8 @@ package com.assistant.uber;
 
 import com.assistant.maps.MapsService;
 import com.assistant.maps.MapsService.GeoPoint;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,15 +25,22 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("UberService - deep link builder")
+@DisplayName("UberService - universal ride links")
 class UberServiceTest {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     @Mock private MapsService mapsService;
     @InjectMocks private UberService uberService;
 
+    private static final GeoPoint HBF = new GeoPoint(52.5250831, 13.369389, "Hauptbahnhof, Europaplatz 1, 10557 Berlin", "Hauptbahnhof");
+    private static final GeoPoint ALEX = new GeoPoint(52.5219, 13.4132, "Alexanderplatz, 10178 Berlin", null);
+
     /** Decoded value of a query parameter of the generated link, or {@code null}. */
     private static String param(String url, String name) {
-        for (String pair : URI.create(url).getRawQuery().split("&")) {
+        String query = URI.create(url).getRawQuery();
+        if (query == null) return null;
+        for (String pair : query.split("&")) {
             String[] kv = pair.split("=", 2);
             if (URLDecoder.decode(kv[0], StandardCharsets.UTF_8).equals(name)) {
                 return URLDecoder.decode(kv[1], StandardCharsets.UTF_8);
@@ -39,52 +49,59 @@ class UberServiceTest {
         return null;
     }
 
+    private static Map<String, Object> location(String url, String name) throws Exception {
+        return JSON.readValue(param(url, name), new TypeReference<>() {});
+    }
+
     @Test
-    @DisplayName("Without a pickup it uses my_location and geocodes the drop-off")
-    void currentLocationPickup() {
-        when(mapsService.geocode("Berlin Hbf")).thenReturn(Optional.of(new GeoPoint(52.525, 13.369, "Berlin Hauptbahnhof, Berlin")));
+    @DisplayName("Without a pickup only drop[0] is set, so Uber uses the rider's location")
+    void currentLocationPickup() throws Exception {
+        when(mapsService.geocode("Berlin Hbf")).thenReturn(Optional.of(HBF));
 
         UberService.RideLink link = uberService.buildRideLink(null, " Berlin Hbf ", "Station");
 
-        assertThat(link.url()).startsWith("https://m.uber.com/ul/?action=setPickup&");
-        assertThat(param(link.url(), "pickup")).isEqualTo("my_location");
-        assertThat(param(link.url(), "dropoff[latitude]")).isEqualTo("52.525");
-        assertThat(param(link.url(), "dropoff[longitude]")).isEqualTo("13.369");
-        assertThat(param(link.url(), "dropoff[formatted_address]")).isEqualTo("Berlin Hauptbahnhof, Berlin");
-        assertThat(param(link.url(), "dropoff[nickname]")).isEqualTo("Station");
+        assertThat(link.url()).startsWith("https://m.uber.com/looking?drop%5B0%5D=");
+        assertThat(param(link.url(), "pickup")).isNull();
+        assertThat(location(link.url(), "drop[0]")).containsExactly(
+                Map.entry("latitude", 52.5250831),
+                Map.entry("longitude", 13.369389),
+                Map.entry("addressLine1", "Station"), // the nickname wins over Google's name
+                Map.entry("addressLine2", "Hauptbahnhof, Europaplatz 1, 10557 Berlin"));
         assertThat(link.pickup()).isEqualTo("Current location");
-        assertThat(link.dropoff()).isEqualTo("Berlin Hauptbahnhof, Berlin");
+        assertThat(link.dropoff()).isEqualTo("Hauptbahnhof, Europaplatz 1, 10557 Berlin");
         assertThat(link.pickupGeocoded()).isFalse();
         assertThat(link.dropoffGeocoded()).isTrue();
         verify(mapsService).geocode("Berlin Hbf");
     }
 
     @Test
-    @DisplayName("Geocodes an explicit pickup and URL-encodes special characters")
-    void explicitPickup() {
-        when(mapsService.geocode("Rue de l'Église & 5")).thenReturn(Optional.of(new GeoPoint(48.8, 2.3, "Rue de l'Église 5, Paris")));
-        when(mapsService.geocode("Orly")).thenReturn(Optional.of(new GeoPoint(48.72, 2.38, "Orly Airport")));
+    @DisplayName("A named pickup becomes the pickup location; names fall back to Google's, then to the typed text")
+    void explicitPickup() throws Exception {
+        when(mapsService.geocode("Alex & Co")).thenReturn(Optional.of(ALEX));
+        when(mapsService.geocode("Berlin Hbf")).thenReturn(Optional.of(HBF));
 
-        UberService.RideLink link = uberService.buildRideLink("Rue de l'Église & 5", "Orly", null);
+        UberService.RideLink link = uberService.buildRideLink("Alex & Co", "Berlin Hbf", null);
 
-        assertThat(link.url()).doesNotContain(" ").doesNotContain("[");
-        assertThat(param(link.url(), "pickup")).isNull();
-        assertThat(param(link.url(), "pickup[latitude]")).isEqualTo("48.8");
-        assertThat(param(link.url(), "pickup[formatted_address]")).isEqualTo("Rue de l'Église 5, Paris");
-        assertThat(param(link.url(), "dropoff[nickname]")).isNull();
+        assertThat(link.url()).startsWith("https://m.uber.com/looking?pickup=").doesNotContain(" ").doesNotContain("{");
+        assertThat(location(link.url(), "pickup"))
+                .containsEntry("latitude", 52.5219)
+                .containsEntry("addressLine1", "Alex & Co") // Google gave no name
+                .containsEntry("addressLine2", "Alexanderplatz, 10178 Berlin");
+        assertThat(location(link.url(), "drop[0]")).containsEntry("addressLine1", "Hauptbahnhof");
         assertThat(link.pickupGeocoded()).isTrue();
     }
 
     @Test
-    @DisplayName("Falls back to the raw address when geocoding is unavailable")
-    void geocodingUnavailable() {
+    @DisplayName("Places that cannot be located are left out of the link and flagged")
+    void notGeocoded() {
         when(mapsService.geocode(anyString())).thenReturn(Optional.empty());
 
         UberService.RideLink link = uberService.buildRideLink("Home street 1", "Office road 2", null);
 
-        assertThat(param(link.url(), "pickup[formatted_address]")).isEqualTo("Home street 1");
-        assertThat(param(link.url(), "dropoff[formatted_address]")).isEqualTo("Office road 2");
-        assertThat(param(link.url(), "dropoff[latitude]")).isNull();
+        assertThat(link.url()).isEqualTo("https://m.uber.com/looking");
+        assertThat(link.pickup()).isEqualTo("Home street 1");
+        assertThat(link.dropoff()).isEqualTo("Office road 2");
+        assertThat(link.pickupGeocoded()).isFalse();
         assertThat(link.dropoffGeocoded()).isFalse();
     }
 

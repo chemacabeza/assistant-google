@@ -152,7 +152,7 @@ describe('Calendar page', () => {
     mockCalendar([standup, { id: 'ev2', summary: 'No place', start: { date: '2026-10-10' } }]);
     server.use(http.get('/api/uber/ride-link', ({ request }) => {
       rideParams.push(new URL(request.url).searchParams);
-      return HttpResponse.json({ url: 'https://m.uber.com/ul/?action=setPickup&dropoff%5Blatitude%5D=1' });
+      return HttpResponse.json({ url: 'https://m.uber.com/looking?drop%5B0%5D=x' });
     }));
     const { user } = renderWithProviders(<Calendar />);
 
@@ -161,7 +161,7 @@ describe('Calendar page', () => {
     await user.click(buttons[0]);
 
     expect(open).toHaveBeenCalledWith('', '_blank');
-    await waitFor(() => expect(tab.location.href).toBe('https://m.uber.com/ul/?action=setPickup&dropoff%5Blatitude%5D=1'));
+    await waitFor(() => expect(tab.location.href).toBe('https://m.uber.com/looking?drop%5B0%5D=x'));
     expect(tab.opener).toBeNull();
     expect(rideParams[0].get('dropoff')).toBe('Room 42');
     expect(rideParams[0].get('nickname')).toBe('Standup');

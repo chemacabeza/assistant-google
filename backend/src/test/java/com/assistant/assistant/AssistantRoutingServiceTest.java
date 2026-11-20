@@ -304,11 +304,11 @@ class AssistantRoutingServiceTest {
         @DisplayName("get_uber_ride_link forwards pickup, dropoff and nickname to UberService")
         void getUberRideLink() throws Exception {
             when(uberService.buildRideLink(null, "Berlin Hbf", "Station"))
-                    .thenReturn(new UberService.RideLink("https://m.uber.com/ul/?action=setPickup", "Current location", "Berlin Hbf", false, true));
+                    .thenReturn(new UberService.RideLink("https://m.uber.com/looking?drop%5B0%5D=x", "Current location", "Berlin Hbf", false, true));
 
             runTool("get_uber_ride_link", Map.of("dropoff", "Berlin Hbf", "dropoffNickname", "Station"));
 
-            assertThat(toolResultContent()).contains("\"url\":\"https://m.uber.com/ul/?action=setPickup\"")
+            assertThat(toolResultContent()).contains("\"url\":\"https://m.uber.com/looking?drop%5B0%5D=x\"")
                     .contains("\"dropoff\":\"Berlin Hbf\"");
         }
 

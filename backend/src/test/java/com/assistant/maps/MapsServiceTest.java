@@ -80,7 +80,7 @@ class MapsServiceTest {
     }
 
     @Test
-    @DisplayName("geocode returns coordinates and the formatted address of the first result")
+    @DisplayName("geocode returns the Geocoding API's first result")
     void geocodeSuccess() {
         http.enqueueJson("""
                 {"status":"OK","results":[{"formatted_address":"Alexanderplatz, 10178 Berlin, Germany",
@@ -89,24 +89,48 @@ class MapsServiceTest {
 
         var point = mapsService.geocode("Alexanderplatz & more");
 
+        assertThat(http.requests()).hasSize(1);
         assertThat(http.lastRequest().uri().getPath()).isEqualTo("/maps/api/geocode/json");
         assertThat(http.lastRequest().queryParam("address")).isEqualTo("Alexanderplatz & more");
         assertThat(http.lastRequest().queryParam("key")).isEqualTo("maps-key");
-        assertThat(point).contains(new MapsService.GeoPoint(52.5219, 13.4132, "Alexanderplatz, 10178 Berlin, Germany"));
+        assertThat(point).contains(new MapsService.GeoPoint(52.5219, 13.4132, "Alexanderplatz, 10178 Berlin, Germany", null));
     }
 
     @Test
-    @DisplayName("geocode is empty for ZERO_RESULTS, upstream errors, blank input or a missing key")
+    @DisplayName("geocode falls back to Places Find Place when the Geocoding API is not enabled")
+    void geocodeFallsBackToFindPlace() {
+        http.enqueueJson("{\"status\":\"REQUEST_DENIED\",\"error_message\":\"This API is not activated\",\"results\":[]}");
+        http.enqueueJson("""
+                {"status":"OK","candidates":[{"name":"Hauptbahnhof","formatted_address":"Hauptbahnhof, Europaplatz 1, 10557 Berlin",
+                  "geometry":{"location":{"lat":52.5250831,"lng":13.369389}}}]}
+                """);
+
+        var point = mapsService.geocode("Berlin Hauptbahnhof");
+
+        assertThat(http.requests()).hasSize(2);
+        var findPlace = http.lastRequest();
+        assertThat(findPlace.uri().getPath()).isEqualTo("/maps/api/place/findplacefromtext/json");
+        assertThat(findPlace.queryParam("input")).isEqualTo("Berlin Hauptbahnhof");
+        assertThat(findPlace.queryParam("inputtype")).isEqualTo("textquery");
+        assertThat(findPlace.queryParam("fields")).isEqualTo("name,formatted_address,geometry");
+        assertThat(findPlace.queryParam("key")).isEqualTo("maps-key");
+        assertThat(point).contains(new MapsService.GeoPoint(52.5250831, 13.369389, "Hauptbahnhof, Europaplatz 1, 10557 Berlin", "Hauptbahnhof"));
+    }
+
+    @Test
+    @DisplayName("geocode is empty when neither API finds the place or both fail, for blank input or without a key")
     void geocodeEmpty() {
         http.enqueueJson("{\"status\":\"ZERO_RESULTS\",\"results\":[]}");
+        http.enqueueJson("{\"status\":\"ZERO_RESULTS\",\"candidates\":[]}");
         assertThat(mapsService.geocode("nowhere")).isEmpty();
 
+        http.enqueue(HttpStatus.SERVICE_UNAVAILABLE, "{}");
         http.enqueue(HttpStatus.SERVICE_UNAVAILABLE, "{}");
         assertThat(mapsService.geocode("somewhere")).isEmpty();
 
         assertThat(mapsService.geocode(" ")).isEmpty();
         ReflectionTestUtils.setField(mapsService, "mapsApiKey", "");
         assertThat(mapsService.geocode("somewhere")).isEmpty();
-        assertThat(http.requests()).hasSize(2);
+        assertThat(http.requests()).hasSize(4);
     }
 }

@@ -45,7 +45,7 @@ This application integrates with the following external services. You must creat
 | **Maps JavaScript API** | Render interactive maps in the browser | [Enable Maps API](https://console.cloud.google.com/apis/library/maps-backend.googleapis.com) |
 | **Maps Directions API** | Calculate driving routes and durations | [Enable Directions API](https://console.cloud.google.com/apis/library/directions-backend.googleapis.com) |
 | **Places API** | Autocomplete and place search functionality | [Enable Places API](https://console.cloud.google.com/apis/library/places-backend.googleapis.com) |
-| **Geocoding API** | Turns addresses into coordinates for Uber ride links | [Enable Geocoding API](https://console.cloud.google.com/apis/library/geocoding-backend.googleapis.com) |
+| **Geocoding API** | Optional: turns addresses into coordinates for Uber ride links (the Places API is used when it is not enabled) | [Enable Geocoding API](https://console.cloud.google.com/apis/library/geocoding-backend.googleapis.com) |
 | **Google OAuth 2.0** | User authentication and authorization | [OAuth Credentials](https://console.cloud.google.com/apis/credentials) |
 | **OpenAI API** | AI assistant intent parsing and responses | [Get API Key](https://platform.openai.com/api-keys) |
 
@@ -173,13 +173,13 @@ The application features a built-in WhatsApp bridge that connects directly to th
 
 ### 5. Uber
 
-The app connects to Uber through Uber's [deep links](https://developer.uber.com/docs/riders/ride-requests/tutorials/deep-links/introduction). No Uber account linking or credentials are needed. Uber's ride-request API is limited to approved partners, so the app does not book rides itself. It opens the Uber app (or `m.uber.com` on desktop) with the pickup and drop-off already filled in, and you confirm the ride there.
+The app connects to Uber through Uber's [universal ride links](https://developer.uber.com/docs/riders/ride-requests/tutorials/deep-links/introduction) (`https://m.uber.com/looking?pickup=…&drop[0]=…`). No Uber account linking or credentials are needed. Uber's ride-request API is limited to approved partners, so the app does not book rides itself. It opens Uber (the app on a phone, the Uber website on a computer) with the trip filled in, and you confirm the ride there. With both pickup and destination set, Uber goes straight to choosing a ride.
 
 *   **Maps page**: search for a place, then click **Ride with Uber to …**.
 *   **Calendar page**: every event with a location has a **Ride with Uber** button.
 *   **Assistant**: ask *"Get me an Uber to Berlin Hauptbahnhof"* or *"Pídeme un Uber al aeropuerto desde la oficina"*. The assistant replies with an *Open in Uber* link.
 
-Pickup defaults to your device's current location. The backend geocodes addresses with the Google **Geocoding API** using `VITE_GOOGLE_MAPS_API_KEY`, so enable that API for the key. Without it the link still carries the address text, but Uber may ask you to confirm the destination. The endpoint is `GET /api/uber/ride-link?dropoff=…[&pickup=…][&nickname=…]`.
+Pickup defaults to your current location. Uber only places locations that have coordinates, so the backend looks addresses up with `VITE_GOOGLE_MAPS_API_KEY`: first through the **Geocoding API**, then through the **Places API** ("Find Place"), which the Maps page already needs. A place that neither finds is left out of the link and you enter it in Uber. The endpoint is `GET /api/uber/ride-link?dropoff=…[&pickup=…][&nickname=…]`.
 
 ## Testing
 

@@ -1,28 +1,27 @@
 import { api } from '../api/axios';
 
-const UBER_BASE_URL = 'https://m.uber.com/ul/';
+const UBER_BASE_URL = 'https://m.uber.com/looking';
 
 /**
- * Builds an Uber deep link that opens the Uber app (or m.uber.com) with the trip
- * pre-filled. Without a pickup Uber uses the device's current location.
- * Places are `{ lat, lng, address, nickname }`; only lat/lng are needed to place the pin.
+ * Builds an Uber universal ride link in the format Uber documents:
+ * `https://m.uber.com/looking?pickup=<Location JSON>&drop[0]=<Location JSON>`. Uber only places
+ * locations that have coordinates. Without a pickup Uber uses (or asks for) the rider's location.
+ * Places are `{ lat, lng, address, nickname }`.
  */
 export function buildUberLink({ pickup, dropoff }) {
-  const params = new URLSearchParams({ action: 'setPickup' });
-  const addPlace = (key, place) => {
-    if (place.lat != null && place.lng != null) {
-      params.set(`${key}[latitude]`, String(place.lat));
-      params.set(`${key}[longitude]`, String(place.lng));
-    }
-    if (place.address) params.set(`${key}[formatted_address]`, place.address);
-    if (place.nickname) params.set(`${key}[nickname]`, place.nickname);
-  };
+  const location = (place) => JSON.stringify({
+    latitude: place.lat,
+    longitude: place.lng,
+    addressLine1: place.nickname || place.address || '',
+    addressLine2: place.address || '',
+  });
+  const hasCoords = (place) => place && place.lat != null && place.lng != null;
 
-  if (pickup) addPlace('pickup', pickup);
-  else params.set('pickup', 'my_location');
-  addPlace('dropoff', dropoff);
-
-  return `${UBER_BASE_URL}?${params.toString()}`;
+  const params = new URLSearchParams();
+  if (hasCoords(pickup)) params.set('pickup', location(pickup));
+  if (hasCoords(dropoff)) params.set('drop[0]', location(dropoff));
+  const query = params.toString();
+  return query ? `${UBER_BASE_URL}?${query}` : UBER_BASE_URL;
 }
 
 /**
