@@ -95,6 +95,10 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
       - name: Build the isolated stack and run the suite
+        env:
+          # Maven Central rate-limits shared runner IPs (429); build the backend image through
+          # Google's public mirror of Central instead.
+          MAVEN_MIRROR_URL: https://maven-central.storage-download.googleapis.com/maven2/
         run: e2e/run.sh
       - name: Upload Playwright report
         if: always()
