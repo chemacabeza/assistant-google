@@ -26,8 +26,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
+echo "Building isolated e2e stack..."
+# Services build with `network: host`, which buildx bake only permits when the network.host
+# entitlement is granted, and `docker compose up --build` cannot grant it (see build.sh).
+"${COMPOSE[@]}" build --print | docker buildx bake --allow=network.host --load -f -
+
 echo "Starting isolated e2e stack..."
-"${COMPOSE[@]}" up -d --build --wait --wait-timeout 300
+"${COMPOSE[@]}" up -d --wait --wait-timeout 300
 
 cd e2e
 [[ -d node_modules ]] || npm ci

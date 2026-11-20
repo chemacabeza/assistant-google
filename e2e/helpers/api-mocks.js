@@ -119,9 +119,12 @@ const CONFIG_ENV = {
   WHATSAPP_VERIFY_TOKEN: 'verify-me',
 };
 
+// Relative timestamps are getters, evaluated whenever a response is serialized: computed once at
+// load time they drifted ("6m ago" instead of "5m ago") when a test ran a minute or more later.
+const isoAgo = (ms) => new Date(Date.now() - ms).toISOString();
 const AUDIT = [
-  { id: 3, actionType: 'SEND_EMAIL', details: 'Executed sendEmail', timestamp: new Date(Date.now() - 5 * 60_000).toISOString() },
-  { id: 2, actionType: 'CREATE_EVENT', details: 'Executed createEvent', timestamp: new Date(Date.now() - 3 * 3600_000).toISOString() },
+  { id: 3, actionType: 'SEND_EMAIL', details: 'Executed sendEmail', get timestamp() { return isoAgo(5 * 60_000); } },
+  { id: 2, actionType: 'CREATE_EVENT', details: 'Executed createEvent', get timestamp() { return isoAgo(3 * 3600_000); } },
   { id: 1, actionType: 'DRIVE_LIST_FILES', details: 'Executed listFiles', timestamp: '2026-01-02T10:00:00' },
 ];
 
